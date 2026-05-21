@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Dispatch Monitor</title>
+<title>Ops Monitor — Beatrice NE</title>
 
 <style>
 :root{
@@ -24,7 +24,6 @@ body{
   overflow:hidden;
 }
 
-/* MAIN LAYOUT */
 #grid{
   display:flex;
   height:100vh;
@@ -48,20 +47,24 @@ body{
 }
 
 #time{
-  font-size:3.2vw;
-  letter-spacing:2px;
-  text-shadow:0 0 12px var(--accent);
+  font-size:3vw;
+  text-shadow:0 0 10px var(--accent);
 }
 
 #date{
-  font-size:14px;
   color:var(--accent);
 }
 
-/* SPACE WEATHER */
 #space{
   font-size:13px;
-  margin-top:6px;
+  margin-top:5px;
+}
+
+/* THREAT */
+#threat{
+  border:1px solid #333;
+  padding:8px;
+  text-align:center;
 }
 
 /* ALERTS */
@@ -81,52 +84,53 @@ body{
 
 /* RADAR */
 #radar{
-  height:60%;
+  height:50%;
   width:100%;
   border:none;
 }
 
-/* INFO PANEL */
+/* INFO */
 #info{
-  height:40%;
+  height:25%;
   border-top:2px solid var(--accent);
   padding:10px;
   overflow:auto;
-  line-height:1.5em;
 }
 
-/* ALERT CARD */
+/* LIGHTNING */
+#lightning{
+  height:25%;
+  border-top:2px solid var(--alert);
+  padding:10px;
+  overflow:auto;
+}
+
 .card{
   border:1px solid #333;
-  margin:6px 0;
-  padding:6px;
+  margin:5px 0;
+  padding:5px;
   font-size:13px;
 }
 
-.high{
-  border-color:var(--alert);
-  box-shadow:0 0 10px var(--alert);
-}
-
 /* =========================
-   NASA EONET TICKER
+   🌍 NASA EONET TICKER
 ========================= */
-#eonet-ticker{
+#nasa-bar{
   position:fixed;
   bottom:0;
   width:100%;
-  height:35px;
+  height:40px;
   background:#000;
   border-top:2px solid var(--accent);
   overflow:hidden;
   z-index:9999;
 }
 
-#eonet-text{
+#nasa-text{
   white-space:nowrap;
   display:inline-block;
   padding-left:100%;
-  animation:scroll-left 60s linear infinite;
+  animation:scroll-left 45s linear infinite;
   color:var(--accent);
   font-size:14px;
 }
@@ -143,180 +147,191 @@ body{
 
 <div id="grid">
 
-  <!-- LEFT -->
-  <div id="left">
+<!-- LEFT -->
+<div id="left">
 
-    <div id="clock">
-      <div id="time">00:00:00</div>
-      <div id="date">Loading...</div>
-      <div id="space">Loading space weather...</div>
-    </div>
-
-    <div id="alerts">Loading alerts...</div>
-
+  <div id="clock">
+    <div id="time">00:00:00</div>
+    <div id="date">Loading...</div>
+    <div id="space">Loading space weather...</div>
   </div>
 
-  <!-- RIGHT -->
-  <div id="right">
+  <div id="threat">
+    THREAT INDEX: <span id="threatVal">0</span>/10
+  </div>
 
-    <iframe id="radar"></iframe>
+  <div id="alerts">Loading alerts...</div>
 
-    <div id="info">
-      <b>Region Focus:</b> Southeast Nebraska / Northeast Kansas<br/><br/>
+</div>
 
-      <div id="weather">Loading weather...</div><br/>
-      <div id="spc">Loading risk...</div><br/>
-      <div id="quake">Loading seismic...</div><br/>
+<!-- RIGHT -->
+<div id="right">
 
-      System Status: ACTIVE
-    </div>
+  <iframe id="radar"></iframe>
 
+  <div id="info">
+    <div id="weather">Loading weather...</div>
+    <div id="iss">Loading ISS...</div>
+    <div id="quake">Loading seismic...</div>
+  </div>
+
+  <div id="lightning">
+    ⚡ Lightning Monitor<br>
+    <div id="lightData">Loading lightning...</div>
   </div>
 
 </div>
 
-<!-- EONET TICKER -->
-<div id="eonet-ticker">
-  <div id="eonet-text">Loading NASA EONET feed...</div>
+</div>
+
+<!-- 🌍 NASA TICKER (RESTORED) -->
+<div id="nasa-bar">
+  <div id="nasa-text">Loading NASA EONET feed...</div>
 </div>
 
 <script>
 
-/* =========================
-   CLOCK
-========================= */
 function pad(n){return String(n).padStart(2,"0");}
 
-function updateClock(){
-  const now=new Date();
-
-  document.getElementById("time").textContent =
-    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-
-  document.getElementById("date").textContent =
-    now.toDateString();
+/* =====================
+   CLOCK
+===================== */
+function clock(){
+  const d=new Date();
+  document.getElementById("time").textContent=
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  document.getElementById("date").textContent=d.toDateString();
 }
+setInterval(clock,1000);
+clock();
 
-setInterval(updateClock,1000);
-updateClock();
-
-/* =========================
+/* =====================
    SPACE WEATHER
-========================= */
-async function loadSpaceWeather(){
+===================== */
+async function loadSpace(){
   try{
-    const res = await fetch(
-      "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
-    );
+    const r = await fetch("https://services.swpc.noaa.gov/json/planetary_k_index_1m.json");
+    const j = await r.json();
 
-    const data = await res.json();
-    const latest = data[data.length - 1];
+    const values = j
+      .map(x => parseFloat(x.kp_index))
+      .filter(v => Number.isFinite(v));
 
-    const kp = parseFloat(latest.kp_index);
-
-    let status = "QUIET";
-    let color = "#00ffc0";
-
-    if(kp >= 5){ status = "STORM WATCH"; color = "#ffb400"; }
-    if(kp >= 7){ status = "SEVERE STORM"; color = "#ff3b3b"; }
+    const kp = values[values.length - 1];
 
     document.getElementById("space").textContent =
-      `🛰️ Kp Index: ${kp.toFixed(2)} | ${status}`;
-
-    document.getElementById("space").style.color = color;
+      `🛰️ Kp Index: ${kp.toFixed(2)}`;
 
   }catch(e){
     document.getElementById("space").textContent =
-      "Space weather offline";
+      "🛰️ Space offline";
   }
 }
 
-/* =========================
-   RADAR
-========================= */
-document.getElementById("radar").src =
-"https://embed.windy.com/embed2.html?lat=39.9&lon=-96.4&zoom=7&level=surface&overlay=radar";
+/* =====================
+   WEATHER (BEATRICE FIXED)
+===================== */
+async function loadWeather(){
+  try{
+    const r = await fetch(
+      "https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph"
+    );
 
-/* =========================
+    const d = await r.json();
+    const w = d.current_weather;
+
+    document.getElementById("weather").innerHTML =
+      `📍 Beatrice, NE<br>` +
+      `🌡️ Temp: ${w.temperature}°F<br>` +
+      `💨 Wind: ${w.windspeed} mph<br>` +
+      `🧭 Dir: ${w.winddirection}°`;
+
+  }catch(e){
+    document.getElementById("weather").innerHTML =
+      "Weather offline";
+  }
+}
+
+/* =====================
+   ISS
+===================== */
+async function loadISS(){
+  try{
+    const r = await fetch("https://api.wheretheiss.at/v1/satellites/25544");
+    const d = await r.json();
+
+    document.getElementById("iss").innerHTML =
+      `🛰️ ISS Alt: ${Math.round(d.altitude)} km | Speed: ${Math.round(d.velocity)} km/h`;
+
+  }catch(e){
+    document.getElementById("iss").innerHTML =
+      "ISS offline";
+  }
+}
+
+/* =====================
+   LIGHTNING
+===================== */
+async function loadLightning(){
+  try{
+    const r = await fetch("https://map.blitzortung.org/map_data.json");
+    const d = await r.json();
+
+    const strikes = d?.flash_data?.length ?? 0;
+
+    document.getElementById("lightData").textContent =
+      `⚡ Active strikes: ${strikes}`;
+
+  }catch(e){
+    document.getElementById("lightData").textContent =
+      "⚡ Lightning offline";
+  }
+}
+
+/* =====================
    NOAA ALERTS
-========================= */
+===================== */
 async function loadAlerts(){
   try{
-    const res = await fetch("https://api.weather.gov/alerts/active?area=NE,KS");
-    const data = await res.json();
+    const r = await fetch(
+      "https://api.weather.gov/alerts/active?area=NE,KS",
+      {headers:{"User-Agent":"ops-dashboard"}}
+    );
+
+    const d = await r.json();
 
     let html="";
-    let emergency=false;
 
-    (data.features||[]).slice(0,10).forEach(a=>{
-      const p=a.properties;
-      const event=(p.event||"").toLowerCase();
+    (d.features || []).slice(0,8).forEach(a=>{
+      const p = a.properties;
 
-      const high =
-        event.includes("tornado") ||
-        p.severity==="Extreme";
-
-      if(high) emergency=true;
-
-      html+=`
-        <div class="card ${high?"high":""}">
-          <b>${p.event}</b><br/>
-          ${p.headline || ""}<br/>
+      html += `
+        <div class="card">
+          <b>${p.event || "Alert"}</b><br>
+          ${p.headline || ""}<br>
           <small>${p.areaDesc || ""}</small>
         </div>
       `;
     });
 
-    document.getElementById("alerts").innerHTML=html;
-
-    document.body.style.background = emergency ? "#120000" : "#000";
+    document.getElementById("alerts").innerHTML =
+      html || "No alerts";
 
   }catch(e){
-    document.getElementById("alerts").innerHTML="Weather offline";
+    document.getElementById("alerts").innerHTML =
+      "Alerts offline";
   }
 }
 
-/* =========================
-   WEATHER
-========================= */
-async function loadWeather(){
-  try{
-    const r = await fetch(
-      "https://api.open-meteo.com/v1/forecast?latitude=40.27&longitude=-96.75&current_weather=true"
-    );
-    const d = await r.json();
-    const w = d.current_weather;
-
-    document.getElementById("weather").innerHTML =
-      `🌡️ Temp: ${w.temperature}° | 💨 Wind: ${w.windspeed} mph`;
-
-  }catch(e){
-    document.getElementById("weather").innerHTML="Weather offline";
-  }
-}
-
-/* =========================
-   SPC
-========================= */
-async function loadSPC(){
-  try{
-    await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk.json");
-
-    document.getElementById("spc").innerHTML =
-      "🌪️ Severe Risk: ACTIVE (Day 1 Outlook)";
-  }catch(e){
-    document.getElementById("spc").innerHTML="SPC offline";
-  }
-}
-
-/* =========================
-   EARTHQUAKE
-========================= */
+/* =====================
+   SEISMIC
+===================== */
 async function loadQuake(){
   try{
     const r = await fetch(
       "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&orderby=time"
     );
+
     const d = await r.json();
     const q = d.features[0];
 
@@ -324,51 +339,70 @@ async function loadQuake(){
       `🌎 M${q.properties.mag} — ${q.properties.place}`;
 
   }catch(e){
-    document.getElementById("quake").innerHTML="Seismic offline";
+    document.getElementById("quake").innerHTML =
+      "Seismic offline";
   }
 }
 
-/* =========================
-   NASA EONET TICKER
-========================= */
-async function loadEONET(){
+/* =====================
+   NASA EONET (RESTORED)
+===================== */
+async function loadNASA(){
   try{
-    const res = await fetch("https://eonet.gsfc.nasa.gov/api/v3/events");
-    const data = await res.json();
+    const r = await fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open");
+    const d = await r.json();
 
-    const events = data.events || [];
+    const events = (d.events || []).slice(0,10);
 
-    const list = events.slice(0,8).map(e=>{
+    if(events.length === 0){
+      document.getElementById("nasa-text").textContent =
+        "🌍 NASA EONET: No active global events";
+      return;
+    }
+
+    const text = events.map(e=>{
       const title = e.title || "Event";
-      const cat = e.categories?.[0]?.title || "Incident";
-      return `${cat}: ${title}`;
-    });
+      const cats = (e.categories || []).map(c=>c.title).join(", ");
+      return `${title} (${cats})`;
+    }).join(" ⚫ ");
 
-    document.getElementById("eonet-text").textContent =
-      "NASA EONET ⚫ " + list.join(" ⚫ ");
+    const el = document.getElementById("nasa-text");
+    el.textContent = "🌍 NASA EONET: " + text;
+
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "scroll-left 45s linear infinite";
 
   }catch(e){
-    document.getElementById("eonet-text").textContent =
-      "NASA EONET offline";
+    document.getElementById("nasa-text").textContent =
+      "🌍 NASA feed offline";
   }
 }
 
-/* =========================
-   RUN ALL
-========================= */
-loadAlerts();
-loadWeather();
-loadSPC();
-loadQuake();
-loadSpaceWeather();
-loadEONET();
+/* =====================
+   RADAR
+===================== */
+document.getElementById("radar").src =
+"https://embed.windy.com/embed2.html?lat=39.9&lon=-96.4&zoom=7&overlay=radar";
 
+/* =====================
+   RUN SYSTEM
+===================== */
+loadSpace();
+loadWeather();
+loadISS();
+loadLightning();
+loadAlerts();
+loadQuake();
+loadNASA();
+
+setInterval(loadSpace,60000);
+setInterval(loadWeather,60000);
+setInterval(loadISS,30000);
+setInterval(loadLightning,60000);
 setInterval(loadAlerts,300000);
-setInterval(loadWeather,300000);
 setInterval(loadQuake,300000);
-setInterval(loadSPC,3600000);
-setInterval(loadSpaceWeather,60000);
-setInterval(loadEONET,300000);
+setInterval(loadNASA,300000);
 
 </script>
 
