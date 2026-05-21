@@ -1,267 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>911 Dispatch Monitor</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>911 Dispatch Radar Monitor</title>
+
 <style>
 :root{
- --bg:#000;
- --text:#fff;
- --accent:#00ffc0;
- --alert:#ff4444;
- --shift:#00ff88;
+  --bg:#000;
+  --text:#fff;
+  --accent:#00ffc0;
+  --alert:#ff4444;
+  --shift:#00ff88;
 }
+
 body{
- margin:0;
- padding:0;
- font-family:Consolas,monospace;
- background:var(--bg);
- color:var(--text);
- overflow:hidden;
+  margin:0;
+  font-family:Consolas, monospace;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
 }
-/* Buttons */
+
+/* TOP BUTTONS */
 #fullscreen-btn,#settings-btn{
- position:fixed;
- top:10px;
- padding:8px 14px;
- border:none;
- cursor:pointer;
- font-weight:bold;
- z-index:9999;
+  position:fixed;
+  top:10px;
+  padding:8px 14px;
+  border:none;
+  cursor:pointer;
+  font-weight:bold;
+  z-index:9999;
 }
+
 #fullscreen-btn{left:10px;background:var(--accent);}
 #settings-btn{right:10px;background:var(--shift);}
+
+/* SETTINGS PANEL */
 #settings-panel{
- position:fixed;
- top:60px;
- right:10px;
- width:280px;
- background:#111;
- border:2px solid var(--accent);
- border-radius:10px;
- padding:15px;
- display:none;
- z-index:9999;
+  position:fixed;
+  top:60px;
+  right:10px;
+  width:280px;
+  background:#111;
+  border:2px solid var(--accent);
+  border-radius:10px;
+  padding:15px;
+  display:none;
+  z-index:9999;
 }
-#settings-panel h3{text-align:center;color:var(--accent);margin-bottom:10px;}
+
 .setting{margin:10px 0;font-size:14px;}
 .setting button{width:100%;padding:6px;margin-top:5px;cursor:pointer;}
-/* Banners */
+
+/* EMERGENCY MODE */
 #emergency-banner{
- position:fixed;bottom:0;width:100%;background:red;color:black;
- text-align:center;font-size:1.8vw;font-weight:bold;padding:8px;
- display:none;animation:flash 1s infinite;
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:red;
+  color:black;
+  text-align:center;
+  font-weight:bold;
+  padding:8px;
+  display:none;
+  animation:flash 1s infinite;
 }
+
 body.emergency #emergency-banner{display:block;}
-#midnight-banner{
- position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);
- background:#ff00ff;color:#fff;font-size:3vw;font-weight:bold;
- padding:30px 50px;border:4px solid #fff;border-radius:20px;
- display:none;z-index:9999;text-align:center;
- animation:flashMidnight 1s infinite;
-}
-/* Animations */
+
 @keyframes flash{50%{opacity:.4;}}
-@keyframes flashMidnight{50%{opacity:.2;}}
-/* Dashboard */
-#dashboard{display:grid;grid-template-columns:50% 50%;height:100%;}
-#left-panel{display:flex;flex-direction:column;align-items:center;padding:20px;border-right:2px solid var(--accent);}
-#clock-panel{text-align:center;}
-#clock-time{font-size:clamp(3rem,6vw,7rem);letter-spacing:.15em;text-shadow:0 0 25px var(--accent);}
-#clock-ms{font-size:1.4vw;color:#aaa;}
-#clock-date{margin-top:15px;font-size:1.5vw;color:var(--accent);}
-#shift-box{margin-top:20px;width:90%;padding:15px;border:2px solid var(--shift);border-radius:10px;text-align:center;}
-#shift-time{font-size:2.2vw;}
-#shift-status{color:#aaa;}
-#calendar-box{margin-top:20px;width:90%;height:400px;border:2px solid var(--accent);border-radius:10px;background: rgba(0,255,192,0.05);display:flex;flex-direction:column;overflow:hidden;}
-#calendar-title{color:var(--accent);margin-bottom:5px;font-size:1.5vw;}
-#calendar-iframe{width:100%;height:100%;border:0;border-radius:10px;filter: invert(1) hue-rotate(180deg) brightness(0.85);scrolling:no;}
-#warnings-panel{padding:35px;overflow:hidden;}
-#warnings-title{font-size:2.2vw;color:var(--alert);margin-bottom:10px;}
-#warnings-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;}
-.warning-card{border:2px solid;border-radius:10px;padding:14px;background:rgba(255,255,255,.04);}
-.tornado{border-color:red;box-shadow:0 0 18px red;animation:flash 1s infinite;}
-.severe{border-color:orange;box-shadow:0 0 14px orange;}
-.winter{border-color:#66ccff;box-shadow:0 0 14px #66ccff;}
-.flood{border-color:purple;box-shadow:0 0 14px purple;}
-#scrolling-bar{position:fixed;bottom:0;width:100%;height:40px;background: rgba(0,0,0,0.85);border-top:2px solid var(--accent);overflow:hidden;z-index:999;}
-#scrolling-text{white-space:nowrap;display:inline-block;padding-left:100%;animation:scroll-left 30s linear infinite;font-size:1.5vw;color:var(--accent);}
-@keyframes scroll-left{0%{transform:translateX(0);}100%{transform:translateX(-100%);}}
+
+/* LAYOUT */
+#dashboard{
+  display:grid;
+  grid-template-columns:45% 55%;
+  height:100vh;
+}
+
+/* LEFT PANEL */
+#left{
+  border-right:2px solid var(--accent);
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+
+#clock{
+  text-align:center;
+}
+
+#clock-time{
+  font-size:5vw;
+  text-shadow:0 0 20px var(--accent);
+}
+
+#clock-date{
+  color:var(--accent);
+}
+
+/* SHIFT */
+#shift{
+  border:2px solid var(--shift);
+  padding:15px;
+  border-radius:10px;
+  text-align:center;
+}
+
+#shift-time{font-size:2vw;}
+
+/* ALERTS */
+#warnings{
+  border:2px solid var(--alert);
+  padding:10px;
+  border-radius:10px;
+  height:40vh;
+  overflow:auto;
+}
+
+/* RIGHT PANEL (RADAR) */
+#right{
+  display:flex;
+  flex-direction:column;
+}
+
+#radar-title{
+  padding:10px;
+  background:#111;
+  border-bottom:2px solid var(--accent);
+  text-align:center;
+  font-weight:bold;
+}
+
+#radar-frame{
+  width:100%;
+  height:100%;
+  border:none;
+}
+
+/* TICKER */
+#ticker{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  height:40px;
+  background:#000;
+  border-top:2px solid var(--accent);
+  overflow:hidden;
+}
+
+#ticker-text{
+  white-space:nowrap;
+  display:inline-block;
+  padding-left:100%;
+  animation:scroll 25s linear infinite;
+  color:var(--accent);
+}
+
+@keyframes scroll{
+  0%{transform:translateX(0);}
+  100%{transform:translateX(-100%);}
+}
 </style>
 </head>
+
 <body>
 
 <button id="fullscreen-btn">FULLSCREEN</button>
 <button id="settings-btn">SETTINGS</button>
 
 <div id="settings-panel">
-<h3>System Settings</h3>
-<div class="setting">Status: <span id="sound-status">🔒 Sound Locked</span></div>
-<div class="setting"><label><input type="checkbox" id="alarm-enabled" checked> Enable Midnight Alarm</label></div>
-<div class="setting">Volume<input type="range" id="alarm-volume" min="0" max="1" step="0.1" value="1"></div>
-<div class="setting"><button id="test-alarm">TEST ALARM</button></div>
-<div class="setting"><button id="test-emergency">TEST EMERGENCY MODE</button></div>
+  <div class="setting">
+    <button id="test-emergency">TEST EMERGENCY</button>
+  </div>
 </div>
 
 <div id="emergency-banner">⚠️ EMERGENCY MODE ACTIVE ⚠️</div>
-<div id="midnight-banner">🎸 ROCKSTAR TIME! 🎸</div>
 
 <div id="dashboard">
-  <div id="left-panel">
-    <div id="clock-panel"><span id="clock-time">00:00:00</span><span id="clock-ms">.000</span></div>
-    <div id="clock-date">-- Day, Month 00 --</div>
-    <div id="shift-box">
-      <div id="shift-title">SHIFT TIMER</div>
+
+  <!-- LEFT -->
+  <div id="left">
+
+    <div id="clock">
+      <div id="clock-time">00:00:00</div>
+      <div id="clock-date">Loading...</div>
+    </div>
+
+    <div id="shift">
+      <div>SHIFT TIMER</div>
       <div id="shift-time">--:--:--</div>
-      <div id="shift-status">LOADING</div>
     </div>
-    <div id="calendar-box">
-      <div id="calendar-title">Upcoming Calendar Events</div>
-      <iframe id="calendar-iframe" src="about:blank" scrolling="no"></iframe>
+
+    <div id="warnings">
+      Loading NOAA alerts...
     </div>
+
   </div>
 
-  <div id="warnings-panel">
-    <div id="warnings-title">Nebraska Active Warnings</div>
-    <div id="warnings-list">Loading alerts...</div>
+  <!-- RIGHT -->
+  <div id="right">
+    <div id="radar-title">LIVE WEATHER RADAR — BEATRICE NE</div>
+    <iframe id="radar-frame"></iframe>
   </div>
+
 </div>
 
-<div id="scrolling-bar"><div id="scrolling-text">Loading updates...</div></div>
+<!-- TICKER -->
+<div id="ticker">
+  <div id="ticker-text">Loading dispatch feed...</div>
+</div>
 
 <script>
-const fsBtn=document.getElementById("fullscreen-btn");
-const settingsBtn=document.getElementById("settings-btn");
-const settingsPanel=document.getElementById("settings-panel");
 
-const clockTime=document.getElementById("clock-time");
-const clockMs=document.getElementById("clock-ms");
-const clockDate=document.getElementById("clock-date");
-
-const shiftTime=document.getElementById("shift-time");
-const shiftStatus=document.getElementById("shift-status");
-
-const warningsList=document.getElementById("warnings-list");
-const calendarIframe=document.getElementById("calendar-iframe");
-const scrollingText=document.getElementById("scrolling-text");
-const midnightBanner=document.getElementById("midnight-banner");
-const soundStatus=document.getElementById("sound-status");
-
-const alarmEnabled=document.getElementById("alarm-enabled");
-const alarmVolume=document.getElementById("alarm-volume");
-const testAlarmBtn=document.getElementById("test-alarm");
-const testEmergencyBtn=document.getElementById("test-emergency");
-
-/* FULLSCREEN */
-fsBtn.onclick=()=>{
- document.documentElement.requestFullscreen().then(unlockSound).catch(()=>{});
+/* ======================
+   FULLSCREEN
+====================== */
+document.getElementById("fullscreen-btn").onclick = () => {
+  document.documentElement.requestFullscreen();
 };
-document.addEventListener("fullscreenchange",()=>{
- fsBtn.style.display=document.fullscreenElement?"none":"block";
-});
 
 /* SETTINGS */
-settingsBtn.onclick=()=>{settingsPanel.style.display = settingsPanel.style.display==="block"?"none":"block";};
+document.getElementById("settings-btn").onclick = () => {
+  const p = document.getElementById("settings-panel");
+  p.style.display = (p.style.display === "block") ? "none" : "block";
+};
 
-/* AUDIO */
-let alarm = new Audio("https://www.soundjay.com/button/beep-07.wav");
-let unlocked=false;
-function unlockSound(){
- if(unlocked) return;
- alarm.play().then(()=>{alarm.pause();alarm.currentTime=0;unlocked=true;soundStatus.textContent="🔊 Sound Ready";}).catch(()=>{});
+/* EMERGENCY TEST */
+document.getElementById("test-emergency").onclick = () => {
+  document.body.classList.toggle("emergency");
+};
+
+/* ======================
+   CLOCK
+====================== */
+function pad(n){return String(n).padStart(2,"0");}
+
+function updateClock(){
+  const now = new Date();
+
+  document.getElementById("clock-time").textContent =
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  document.getElementById("clock-date").textContent =
+    now.toDateString();
 }
 
-/* PLAY ALARM */
-function playAlarm(duration){
- if(!alarmEnabled.checked || !unlocked) return;
- midnightBanner.style.display="block";
- alarm.volume=alarmVolume.value;
- alarm.loop=true;
- alarm.play();
- notifyBackup();
- setTimeout(()=>{midnightBanner.style.display="none";alarm.pause();alarm.currentTime=0;},duration);
+setInterval(updateClock,1000);
+updateClock();
+
+/* ======================
+   SHIFT TIMER
+====================== */
+const SHIFT_START = "17:30";
+const SHIFT_END = "05:30";
+
+function updateShift(){
+  const now = new Date();
+
+  let [sh,sm] = SHIFT_START.split(":").map(Number);
+  let [eh,em] = SHIFT_END.split(":").map(Number);
+
+  let start = new Date(now);
+  start.setHours(sh,sm,0,0);
+
+  let end = new Date(now);
+  end.setHours(eh,em,0,0);
+
+  if(end <= start){
+    if(now < end) start.setDate(start.getDate()-1);
+    else end.setDate(end.getDate()+1);
+  }
+
+  const active = now>=start && now<=end;
+  const diff = active ? end-now : start-now;
+
+  const h = Math.floor(diff/3600000);
+  const m = Math.floor(diff/60000%60);
+  const s = Math.floor(diff/1000%60);
+
+  document.getElementById("shift-time").textContent =
+    `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
-/* TEST BUTTONS */
-testAlarmBtn.onclick=()=>{if(!unlocked){alert("Click FULLSCREEN first"); return;} playAlarm(5000);};
-testEmergencyBtn.onclick=()=>{document.body.classList.toggle("emergency"); if(document.body.classList.contains("emergency")) setTimeout(()=>document.body.classList.remove("emergency"),10000);};
+setInterval(updateShift,1000);
+updateShift();
 
-/* CLOCK + SHIFT TIMER */
-const SHIFT_START="17:30",SHIFT_END="05:30";
-function pad(n){return String(Math.floor(n)).padStart(2,"0");}
+/* ======================
+   WEATHER RADAR (WINDY)
+====================== */
+document.getElementById("radar-frame").src =
+"https://embed.windy.com/embed2.html?lat=40.268&lon=-96.746&zoom=7&level=surface&overlay=radar&menu=&message=true";
 
-function updateShiftTimer(){
- const now=new Date();
- let [sh,sm]=SHIFT_START.split(":").map(Number);
- let [eh,em]=SHIFT_END.split(":").map(Number);
- let start=new Date(now); start.setHours(sh,sm,0,0);
- let end=new Date(now); end.setHours(eh,em,0,0);
- if(end<=start){if(now<end) start.setDate(start.getDate()-1); else end.setDate(end.getDate()+1);}
- let onShift = now>=start && now<=end;
- let r = onShift ? end-now : start-now;
- let h=Math.floor(r/3600000);
- let m=Math.floor(r/60000%60);
- let s=Math.floor(r/1000%60);
- shiftTime.textContent=`${pad(h)}:${pad(m)}:${pad(s)}`;
- shiftStatus.textContent=onShift?"ON SHIFT":"UNTIL SHIFT";
+/* ======================
+   NOAA ALERTS
+====================== */
+async function loadAlerts(){
+  try{
+    const res = await fetch("https://api.weather.gov/alerts/active?area=NE");
+    const data = await res.json();
+
+    let html = "";
+
+    if(!data.features.length){
+      document.getElementById("warnings").innerHTML = "No active alerts.";
+      document.body.classList.remove("emergency");
+      return;
+    }
+
+    let emergency = false;
+
+    data.features.slice(0,6).forEach(a=>{
+      const p = a.properties;
+      const event = p.event.toLowerCase();
+
+      if(event.includes("tornado")) emergency = true;
+
+      html += `
+        <div style="border:1px solid #444;padding:8px;margin:6px 0;">
+          <b>${p.event}</b><br>
+          ${p.headline}<br>
+          <small>Until: ${new Date(p.expires).toLocaleString()}</small>
+        </div>
+      `;
+    });
+
+    document.getElementById("warnings").innerHTML = html;
+
+    if(emergency){
+      document.body.classList.add("emergency");
+    } else {
+      document.body.classList.remove("emergency");
+    }
+
+  }catch(e){
+    document.getElementById("warnings").innerHTML =
+      "Weather service offline";
+  }
 }
 
-setInterval(()=>{
- const now=new Date();
- clockTime.textContent=`${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
- clockMs.textContent="."+String(now.getMilliseconds()).padStart(3,"0");
- clockDate.textContent=now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
- updateShiftTimer();
-},50);
+loadAlerts();
+setInterval(loadAlerts,300000);
 
-/* MIDNIGHT ALARM */
-let lastTriggeredDay="";
-setInterval(()=>{
- const now=new Date();
- const today=now.toDateString();
- if(now.getHours()===0 && now.getMinutes()===0 && now.getSeconds()===0 && today!==lastTriggeredDay && unlocked){
-  lastTriggeredDay=today;
-  playAlarm(60000);
- }
-},1000);
+/* ======================
+   TICKER
+====================== */
+const feed = [
+"I-80 westbound traffic normal",
+"Beatrice weather monitoring active",
+"NOAA radar updating every 5 min",
+"Dispatch system operational"
+];
 
-/* NOTIFICATIONS */
-function notifyBackup(){
- if(Notification.permission==="granted") new Notification("🎸 ROCKSTAR TIME!",{body:"Midnight Alarm Triggered"});
- else if(Notification.permission!=="denied") Notification.requestPermission();
+function updateTicker(){
+  document.getElementById("ticker-text").textContent =
+    feed.join(" ⚫ ");
 }
 
-/* WEATHER */
-async function loadWarnings(){
- try{
-  const res=await fetch("https://api.weather.gov/alerts/active?area=NE",{headers:{"User-Agent":"dispatch-monitor"}});
-  const data=await res.json();
-  document.body.classList.remove("emergency");
-  if(!data.features || data.features.length===0){warningsList.innerHTML="<div>No Active Alerts</div>"; return;}
-  let html="",emergency=false;
-  data.features.slice(0,6).forEach(a=>{
-   const p=a.properties;
-   let cls="",e=p.event.toLowerCase();
-   if(e.includes("tornado")){cls="tornado";emergency=true;}
-   else if(e.includes("severe")) cls="severe";
-   else if(e.includes("winter")||e.includes("blizzard")) cls="winter";
-   else if(e.includes("flood")) cls="flood";
-   html+=`<div class="warning-card ${cls}"><strong>${p.event}</strong><br>${p.headline}<br><span style="color:var(--accent)">Until: ${new Date(p.expires).toLocaleString()}</span></div>`;
-  });
-  warningsList.innerHTML=html;
-  if(emergency) document.body.classList.add("emergency");
- }catch(err){warningsList.innerHTML="<div style='color:red'>Weather API Offline</div>"; console.log(err);}
-}
-loadWarnings(); setInterval(loadWarnings,300000);
+updateTicker();
+setInterval(updateTicker,300000);
 
-/* CALENDAR */
-calendarIframe.src="https://calendar.google.com/calendar/embed?src=beatrice.ne.gov_ne4nvf6ctq87f6pqvfkn7bgof8%40group.calendar.google.com&ctz=America%2FChicago&mode=AGENDA&bgcolor=%23000000&color=%2300ff00&showTitle=0&showNav=0&showTabs=0&showCalendars=0&showTz=0";
-
-/* SCROLLING BAR */
-const trafficUpdates=["I-80 Westbound: heavy congestion near Lincoln.","Beatrice Main St: construction delays downtown.","Highway 77: accident cleared, traffic flowing normally."];
-function updateScrollingText(){scrollingText.textContent=[...trafficUpdates,"Sample news headline ⚫ Another headline ⚫ More updates"].join(" ⚫ ");scrollingText.style.animation="none"; void scrollingText.offsetWidth; scrollingText.style.animation="scroll-left 30s linear infinite";}
-updateScrollingText(); setInterval(updateScrollingText,300000);
 </script>
+
 </body>
 </html>
