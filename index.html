@@ -289,13 +289,13 @@ async function loadNASA(){
 }
 
 /* ==================================
-    🧬 GITHUB LIVE JSON FETCH
+    🧬 DIRECT LOCAL JSON FETCH
 ================================== */
 async function loadJsonFeed(){
   const el = document.getElementById("json-text");
   try {
-    // ⬇️ UPDATE THIS LINK WITH YOUR GITHUB USERNAME AND REPO NAME ⬇️
-    const url = "https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/main/ops-feed.json";
+    // Points directly to the local folder file shown in your directory structure
+    const url = "ops-feed.json";
     
     const r = await fetch(url, { cache: "no-store" });
     if(!r.ok) throw new Error("HTTP error " + r.status);
@@ -307,7 +307,7 @@ async function loadJsonFeed(){
       el.textContent = "📡 OPS FEED: No logs inside JSON file.";
     }
   } catch(e) {
-    el.textContent = "📡 JSON FEED OFFLINE (Check Network / URL)";
+    el.textContent = "📡 JSON FEED OFFLINE (Check File Name)";
     console.log("JSON Fetch Fail: ", e);
   }
 
@@ -336,7 +336,7 @@ setInterval(loadLightning,60000);
 setInterval(loadAlerts,300000);
 setInterval(loadQuake,300000);
 setInterval(loadNASA,300000);
-setInterval(loadJsonFeed,60000); // Ticker looks for fresh updates in your JSON file every 60 seconds
+setInterval(loadJsonFeed,60000);
 
 </script>
 
