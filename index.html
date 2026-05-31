@@ -181,7 +181,7 @@ body{
 </div>
 
 <div id="json-bar" class="ticker-wrap">
-  <div id="json-text" class="ticker-text">Fetching Live Network JSON Feed...</div>
+  <div id="json-text" class="ticker-text">Connecting to GitHub Live Data Stream...</div>
 </div>
 
 <div id="nasa-bar" class="ticker-wrap">
@@ -289,13 +289,13 @@ async function loadNASA(){
 }
 
 /* ==================================
-    🧬 DIRECT LOCAL JSON FETCH
+    🧬 CACHE-BUSTING GITHUB FETCH
 ================================== */
 async function loadJsonFeed(){
   const el = document.getElementById("json-text");
   try {
-    // Points directly to the local folder file shown in your directory structure
-    const url = "ops-feed.json";
+    // Appends a unique cache-busting timestamp (?_=(time)) so GitHub servers process it freshly every minute
+    const url = "ops-feed.json?_=" + new Date().getTime();
     
     const r = await fetch(url, { cache: "no-store" });
     if(!r.ok) throw new Error("HTTP error " + r.status);
@@ -307,7 +307,7 @@ async function loadJsonFeed(){
       el.textContent = "📡 OPS FEED: No logs inside JSON file.";
     }
   } catch(e) {
-    el.textContent = "📡 JSON FEED OFFLINE (Check File Name)";
+    el.textContent = "📡 JSON FEED OFFLINE (Check Repository)";
     console.log("JSON Fetch Fail: ", e);
   }
 
