@@ -11,6 +11,7 @@
   --text:#fff;
   --accent:#00ffc0;
   --alert:#ff3b3b;
+  --json-color:#ff00ff;
 }
 
 *{box-sizing:border-box;}
@@ -26,7 +27,7 @@ body{
 
 #grid{
   display:flex;
-  height:100vh;
+  height: calc(100vh - 80px); 
 }
 
 /* LEFT */
@@ -113,27 +114,32 @@ body{
 }
 
 /* =========================
-   🌍 NASA EONET TICKER
+    TICKER STYLES
 ========================= */
-#nasa-bar{
+.ticker-wrap {
   position:fixed;
-  bottom:0;
   width:100%;
   height:40px;
   background:#000;
-  border-top:2px solid var(--accent);
   overflow:hidden;
   z-index:9999;
 }
 
-#nasa-text{
+.ticker-text {
   white-space:nowrap;
   display:inline-block;
   padding-left:100%;
   animation:scroll-left 45s linear infinite;
-  color:var(--accent);
   font-size:14px;
 }
+
+/* 🌍 NASA TICKER (Bottom) */
+#nasa-bar{ bottom:0; border-top:2px solid var(--accent); }
+#nasa-text{ color:var(--accent); }
+
+/* 🧬 JSON TICKER (Above NASA) */
+#json-bar{ bottom:40px; border-top:2px solid var(--json-color); background: rgba(0,0,0,0.9); }
+#json-text{ color:var(--json-color); }
 
 @keyframes scroll-left{
   0%{transform:translateX(0);}
@@ -147,55 +153,46 @@ body{
 
 <div id="grid">
 
-<!-- LEFT -->
 <div id="left">
-
   <div id="clock">
     <div id="time">00:00:00</div>
     <div id="date">Loading...</div>
     <div id="space">Loading space weather...</div>
   </div>
-
   <div id="threat">
     THREAT INDEX: <span id="threatVal">0</span>/10
   </div>
-
   <div id="alerts">Loading alerts...</div>
-
 </div>
 
-<!-- RIGHT -->
 <div id="right">
-
   <iframe id="radar"></iframe>
-
   <div id="info">
     <div id="weather">Loading weather...</div>
     <div id="iss">Loading ISS...</div>
     <div id="quake">Loading seismic...</div>
   </div>
-
   <div id="lightning">
     ⚡ Lightning Monitor<br>
     <div id="lightData">Loading lightning...</div>
   </div>
-
 </div>
 
 </div>
 
-<!-- 🌍 NASA TICKER (RESTORED) -->
-<div id="nasa-bar">
-  <div id="nasa-text">Loading NASA EONET feed...</div>
+<div id="json-bar" class="ticker-wrap">
+  <div id="json-text" class="ticker-text">Fetching Live Network JSON Feed...</div>
+</div>
+
+<div id="nasa-bar" class="ticker-wrap">
+  <div id="nasa-text" class="ticker-text">Loading NASA EONET feed...</div>
 </div>
 
 <script>
 
 function pad(n){return String(n).padStart(2,"0");}
 
-/* =====================
-   CLOCK
-===================== */
+/* CLOCK */
 function clock(){
   const d=new Date();
   document.getElementById("time").textContent=
@@ -205,189 +202,124 @@ function clock(){
 setInterval(clock,1000);
 clock();
 
-/* =====================
-   SPACE WEATHER
-===================== */
+/* SPACE WEATHER */
 async function loadSpace(){
   try{
     const r = await fetch("https://services.swpc.noaa.gov/json/planetary_k_index_1m.json");
     const j = await r.json();
-
-    const values = j
-      .map(x => parseFloat(x.kp_index))
-      .filter(v => Number.isFinite(v));
-
+    const values = j.map(x => parseFloat(x.kp_index)).filter(v => Number.isFinite(v));
     const kp = values[values.length - 1];
-
-    document.getElementById("space").textContent =
-      `🛰️ Kp Index: ${kp.toFixed(2)}`;
-
-  }catch(e){
-    document.getElementById("space").textContent =
-      "🛰️ Space offline";
-  }
+    document.getElementById("space").textContent = `🛰️ Kp Index: ${kp.toFixed(2)}`;
+  }catch(e){ document.getElementById("space").textContent = "🛰️ Space offline"; }
 }
 
-/* =====================
-   WEATHER (BEATRICE FIXED)
-===================== */
+/* WEATHER */
 async function loadWeather(){
   try{
-    const r = await fetch(
-      "https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph"
-    );
-
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph");
     const d = await r.json();
     const w = d.current_weather;
-
-    document.getElementById("weather").innerHTML =
-      `📍 Beatrice, NE<br>` +
-      `🌡️ Temp: ${w.temperature}°F<br>` +
-      `💨 Wind: ${w.windspeed} mph<br>` +
-      `🧭 Dir: ${w.winddirection}°`;
-
-  }catch(e){
-    document.getElementById("weather").innerHTML =
-      "Weather offline";
-  }
+    document.getElementById("weather").innerHTML = `📍 Beatrice, NE<br>🌡️ Temp: ${w.temperature}°F<br>💨 Wind: ${w.windspeed} mph<br>🧭 Dir: ${w.winddirection}°`;
+  }catch(e){ document.getElementById("weather").innerHTML = "Weather offline"; }
 }
 
-/* =====================
-   ISS
-===================== */
+/* ISS */
 async function loadISS(){
   try{
     const r = await fetch("https://api.wheretheiss.at/v1/satellites/25544");
     const d = await r.json();
-
-    document.getElementById("iss").innerHTML =
-      `🛰️ ISS Alt: ${Math.round(d.altitude)} km | Speed: ${Math.round(d.velocity)} km/h`;
-
-  }catch(e){
-    document.getElementById("iss").innerHTML =
-      "ISS offline";
-  }
+    document.getElementById("iss").innerHTML = `🛰️ ISS Alt: ${Math.round(d.altitude)} km | Speed: ${Math.round(d.velocity)} km/h`;
+  }catch(e){ document.getElementById("iss").innerHTML = "ISS offline"; }
 }
 
-/* =====================
-   LIGHTNING
-===================== */
+/* LIGHTNING */
 async function loadLightning(){
   try{
     const r = await fetch("https://map.blitzortung.org/map_data.json");
     const d = await r.json();
-
     const strikes = d?.flash_data?.length ?? 0;
-
-    document.getElementById("lightData").textContent =
-      `⚡ Active strikes: ${strikes}`;
-
-  }catch(e){
-    document.getElementById("lightData").textContent =
-      "⚡ Lightning offline";
-  }
+    document.getElementById("lightData").textContent = `⚡ Active strikes: ${strikes}`;
+  }catch(e){ document.getElementById("lightData").textContent = "⚡ Lightning offline"; }
 }
 
-/* =====================
-   NOAA ALERTS
-===================== */
+/* NOAA ALERTS */
 async function loadAlerts(){
   try{
-    const r = await fetch(
-      "https://api.weather.gov/alerts/active?area=NE,KS",
-      {headers:{"User-Agent":"ops-dashboard"}}
-    );
-
+    const r = await fetch("https://api.weather.gov/alerts/active?area=NE,KS", {headers:{"User-Agent":"ops-dashboard"}});
     const d = await r.json();
-
     let html="";
-
     (d.features || []).slice(0,8).forEach(a=>{
       const p = a.properties;
-
-      html += `
-        <div class="card">
-          <b>${p.event || "Alert"}</b><br>
-          ${p.headline || ""}<br>
-          <small>${p.areaDesc || ""}</small>
-        </div>
-      `;
+      html += `<div class="card"><b>${p.event || "Alert"}</b><br>${p.headline || ""}<br><small>${p.areaDesc || ""}</small></div>`;
     });
-
-    document.getElementById("alerts").innerHTML =
-      html || "No alerts";
-
-  }catch(e){
-    document.getElementById("alerts").innerHTML =
-      "Alerts offline";
-  }
+    document.getElementById("alerts").innerHTML = html || "No alerts";
+  }catch(e){ document.getElementById("alerts").innerHTML = "Alerts offline"; }
 }
 
-/* =====================
-   SEISMIC
-===================== */
+/* SEISMIC */
 async function loadQuake(){
   try{
-    const r = await fetch(
-      "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&orderby=time"
-    );
-
+    const r = await fetch("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&orderby=time");
     const d = await r.json();
     const q = d.features[0];
-
-    document.getElementById("quake").innerHTML =
-      `🌎 M${q.properties.mag} — ${q.properties.place}`;
-
-  }catch(e){
-    document.getElementById("quake").innerHTML =
-      "Seismic offline";
-  }
+    document.getElementById("quake").innerHTML = `🌎 M${q.properties.mag} — ${q.properties.place}`;
+  }catch(e){ document.getElementById("quake").innerHTML = "Seismic offline"; }
 }
 
-/* =====================
-   NASA EONET (RESTORED)
-===================== */
+/* NASA EONET */
 async function loadNASA(){
   try{
     const r = await fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open");
     const d = await r.json();
-
     const events = (d.events || []).slice(0,10);
-
     if(events.length === 0){
-      document.getElementById("nasa-text").textContent =
-        "🌍 NASA EONET: No active global events";
+      document.getElementById("nasa-text").textContent = "🌍 NASA EONET: No active global events";
       return;
     }
-
     const text = events.map(e=>{
       const title = e.title || "Event";
       const cats = (e.categories || []).map(c=>c.title).join(", ");
       return `${title} (${cats})`;
     }).join(" ⚫ ");
-
     const el = document.getElementById("nasa-text");
     el.textContent = "🌍 NASA EONET: " + text;
-
-    el.style.animation = "none";
-    void el.offsetWidth;
+    el.style.animation = "none"; void el.offsetWidth;
     el.style.animation = "scroll-left 45s linear infinite";
-
-  }catch(e){
-    document.getElementById("nasa-text").textContent =
-      "🌍 NASA feed offline";
-  }
+  }catch(e){ document.getElementById("nasa-text").textContent = "🌍 NASA feed offline"; }
 }
 
-/* =====================
-   RADAR
-===================== */
-document.getElementById("radar").src =
-"https://embed.windy.com/embed2.html?lat=39.9&lon=-96.4&zoom=7&overlay=radar";
+/* ==================================
+    🧬 GITHUB LIVE JSON FETCH
+================================== */
+async function loadJsonFeed(){
+  const el = document.getElementById("json-text");
+  try {
+    // ⬇️ UPDATE THIS LINK WITH YOUR GITHUB USERNAME AND REPO NAME ⬇️
+    const url = "https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/main/ops-feed.json";
+    
+    const r = await fetch(url, { cache: "no-store" });
+    if(!r.ok) throw new Error("HTTP error " + r.status);
+    const d = await r.json();
+    
+    if(d && d.messages && d.messages.length > 0) {
+      el.textContent = "📡 OPS FEED: " + d.messages.join(" ⚪ ");
+    } else {
+      el.textContent = "📡 OPS FEED: No logs inside JSON file.";
+    }
+  } catch(e) {
+    el.textContent = "📡 JSON FEED OFFLINE (Check Network / URL)";
+    console.log("JSON Fetch Fail: ", e);
+  }
 
-/* =====================
-   RUN SYSTEM
-===================== */
+  el.style.animation = "none";
+  void el.offsetWidth;
+  el.style.animation = "scroll-left 40s linear infinite";
+}
+
+/* RADAR */
+document.getElementById("radar").src = "https://embed.windy.com/embed2.html?lat=39.9&lon=-96.4&zoom=7&overlay=radar";
+
+/* RUN SYSTEM */
 loadSpace();
 loadWeather();
 loadISS();
@@ -395,6 +327,7 @@ loadLightning();
 loadAlerts();
 loadQuake();
 loadNASA();
+loadJsonFeed();
 
 setInterval(loadSpace,60000);
 setInterval(loadWeather,60000);
@@ -403,6 +336,7 @@ setInterval(loadLightning,60000);
 setInterval(loadAlerts,300000);
 setInterval(loadQuake,300000);
 setInterval(loadNASA,300000);
+setInterval(loadJsonFeed,60000); // Ticker looks for fresh updates in your JSON file every 60 seconds
 
 </script>
 
