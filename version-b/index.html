@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Tactical Command System v4.5</title>
+<title>Tactical Command System v4.7</title>
 <style>
 :root{
   --bg:#030506;
@@ -20,6 +20,23 @@
   --text:#d7f4ff;
   --muted:#8ca4b0;
   --shadow:0 0 0 1px rgba(255,255,255,.02), 0 12px 30px rgba(0,0,0,.45);
+  --radius:6px;
+}
+
+body.theme-alt{
+  --bg:#05040a;
+  --bg2:#0b1020;
+  --panel:rgba(15,14,26,.94);
+  --panel2:#15122a;
+  --line:#2b2244;
+  --line2:#5340a8;
+  --accent:#9b7bff;
+  --accent2:#d1c5ff;
+  --danger:#ff5f7a;
+  --warn:#ffc857;
+  --ok:#62ffb0;
+  --text:#f0ebff;
+  --muted:#a8a0c2;
 }
 
 *{box-sizing:border-box;}
@@ -35,6 +52,13 @@ body{
     linear-gradient(180deg, #000 0%, var(--bg) 100%);
 }
 
+body.theme-alt{
+  background:
+    radial-gradient(circle at top, rgba(155,123,255,.10), transparent 30%),
+    radial-gradient(circle at bottom, rgba(75,230,255,.06), transparent 35%),
+    linear-gradient(180deg, #000 0%, var(--bg) 100%);
+}
+
 body::before{
   content:"";
   position:fixed;
@@ -46,6 +70,12 @@ body::before{
   background-size:24px 24px;
   mask-image: radial-gradient(circle at center, rgba(0,0,0,.85), transparent 85%);
   opacity:.55;
+}
+
+body.theme-alt::before{
+  background-image:
+    linear-gradient(rgba(155,123,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(155,123,255,.04) 1px, transparent 1px);
 }
 
 #alert{
@@ -84,6 +114,7 @@ body::before{
   box-shadow:var(--shadow);
   position:relative;
   z-index:10;
+  gap:12px;
 }
 
 #header .title{
@@ -104,6 +135,14 @@ body::before{
   color:var(--accent2);
   background:rgba(0,255,213,.05);
   font-size:11px;
+}
+
+#headerActions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end;
 }
 
 #headerTime{
@@ -151,7 +190,7 @@ body::before{
   padding:10px;
   font-size:12px;
   color:var(--muted);
-  border-radius:6px;
+  border-radius:var(--radius);
   min-height:42px;
 }
 
@@ -166,14 +205,14 @@ body::before{
   padding:8px 10px;
   font-size:11px;
   color:var(--muted);
-  border-radius:6px;
+  border-radius:var(--radius);
 }
 
 #forecast{
   border:1px solid var(--line);
   background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
   padding:10px;
-  border-radius:6px;
+  border-radius:var(--radius);
   display:grid;
   gap:8px;
 }
@@ -240,6 +279,11 @@ button:hover{
   background:rgba(0,255,213,.12);
 }
 
+button.secondary{
+  background:rgba(255,255,255,.03);
+  color:var(--text);
+}
+
 #incidents{
   display:grid;
   gap:6px;
@@ -250,7 +294,13 @@ button:hover{
   font-size:12px;
   background:rgba(255,255,255,.02);
   border:1px solid var(--line);
-  border-radius:6px;
+  border-radius:var(--radius);
+  animation:incidentIn .22s ease-out;
+}
+
+@keyframes incidentIn{
+  from{opacity:0; transform:translateY(-4px);}
+  to{opacity:1; transform:translateY(0);}
 }
 
 .CRITICAL{border-left:4px solid var(--danger);}
@@ -270,7 +320,7 @@ button:hover{
   border:1px solid var(--line);
   background:#000;
   overflow:hidden;
-  border-radius:6px;
+  border-radius:var(--radius);
   box-shadow:var(--shadow);
 }
 
@@ -323,7 +373,7 @@ button:hover{
 .card{
   border:1px solid var(--line);
   background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
-  border-radius:6px;
+  border-radius:var(--radius);
   padding:10px;
   font-size:12px;
   min-height:96px;
@@ -337,6 +387,10 @@ button:hover{
   text-transform:uppercase;
   letter-spacing:.7px;
   font-size:11px;
+}
+
+.card .subrow{
+  margin-top:4px;
 }
 
 .ticker{
@@ -372,6 +426,35 @@ button:hover{
 .status-warn{color:var(--warn);}
 .status-bad{color:var(--danger);}
 
+.pulse{
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--ok);
+  box-shadow:0 0 10px currentColor;
+  vertical-align:middle;
+  margin-right:6px;
+}
+
+.pulse.offline{
+  background:var(--danger);
+}
+
+#footerNote{
+  position:fixed;
+  right:12px;
+  bottom:84px;
+  z-index:999;
+  color:var(--muted);
+  font-size:11px;
+  background:rgba(0,0,0,.55);
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:6px 10px;
+  backdrop-filter:blur(6px);
+}
+
 @media (max-width: 1100px){
   body{overflow:auto;}
   #grid{
@@ -397,6 +480,10 @@ button:hover{
     align-items:flex-start;
     flex-direction:column;
   }
+  #headerActions{
+    width:100%;
+    justify-content:space-between;
+  }
   #headerTime{
     font-size:12px;
   }
@@ -407,6 +494,20 @@ button:hover{
   #left{
     padding:8px;
   }
+  #footerNote{
+    right:8px;
+    bottom:86px;
+    max-width:calc(100vw - 16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:0.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:0.01ms !important;
+    scroll-behavior:auto !important;
+  }
 }
 </style>
 </head>
@@ -416,10 +517,14 @@ button:hover{
 
 <div id="header">
   <div class="title">
-    <span>TACTICAL COMMAND v4.5</span>
+    <span>TACTICAL COMMAND v4.7</span>
     <span class="badge">COMMAND CENTER</span>
   </div>
-  <div id="headerTime"></div>
+  <div id="headerActions">
+    <button id="themeBtn" type="button">Theme</button>
+    <button id="motionBtn" type="button" class="secondary">Motion</button>
+    <div id="headerTime"></div>
+  </div>
 </div>
 
 <div id="grid">
@@ -428,7 +533,7 @@ button:hover{
 
     <div id="metaLine">
       <div id="lastUpdated">Last update: --</div>
-      <div id="sourceState">Sources: initializing</div>
+      <div id="sourceState"><span class="pulse offline"></span>Sources: initializing</div>
     </div>
 
     <div id="summary">System initializing...</div>
@@ -476,17 +581,16 @@ button:hover{
 
 <div id="jsonBar" class="ticker"><div class="track" id="jsonTrack">Loading ops feed...</div></div>
 <div id="nasaBar" class="ticker"><div class="track" id="nasaTrack">Loading NASA feed...</div></div>
+<div id="footerNote">v4.7 · Beatrice, Nebraska · live tactical display</div>
 
 <script>
 const CONFIG = {
-  lat: 40.2681,
-  lon: -96.7467,
-  weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current=true&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto',
+  weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto',
   kpUrl: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
   issUrl: 'https://api.wheretheiss.at/v1/satellites/25544',
   quakeUrl: 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&orderby=time',
   netUrl: 'https://www.cloudflarestatus.com/api/v2/summary.json',
-  nasaUrl: 'https://eonet.gsfc.nasa.gov/api/v3/events',
+  nasaUrl: 'https://eonet.gsfc.nasa.gov/api/v3/events?limit=5&days=20&status=open',
   opsUrl: 'ops-feed.json?_='
 };
 
@@ -497,6 +601,8 @@ const state = {
   risk: 0,
   history: [],
   weatherOk: false,
+  motionEnabled: true,
+  themeAlt: false,
   sources: {
     weather: false,
     space: false,
@@ -506,7 +612,8 @@ const state = {
     nasa: false,
     ops: false
   },
-  lastUpdate: null
+  lastUpdate: null,
+  incidentKeys: new Set()
 };
 
 const els = {
@@ -529,7 +636,9 @@ const els = {
   jsonTrack: document.getElementById('jsonTrack'),
   lastUpdated: document.getElementById('lastUpdated'),
   sourceState: document.getElementById('sourceState'),
-  clearIncidents: document.getElementById('clearIncidents')
+  clearIncidents: document.getElementById('clearIncidents'),
+  themeBtn: document.getElementById('themeBtn'),
+  motionBtn: document.getElementById('motionBtn')
 };
 
 function nowTime(){
@@ -587,7 +696,9 @@ function riskText(risk){
   return 'HIGH';
 }
 
-function addIncident(text, type='INFO'){
+function addIncident(text, type='INFO', key=''){
+  if (key && state.incidentKeys.has(key)) return;
+  if (key) state.incidentKeys.add(key);
   const d = document.createElement('div');
   d.className = `incident ${type}`;
   d.textContent = text;
@@ -597,11 +708,13 @@ function addIncident(text, type='INFO'){
 }
 
 function clearIncidents(){
+  state.incidentKeys.clear();
   els.incidents.innerHTML = '';
   els.incidentCount.textContent = '0';
 }
 
 function dot(){
+  if (!state.motionEnabled) return;
   const d = document.createElement('div');
   d.className = 'dot';
   d.style.left = Math.random() * 100 + '%';
@@ -615,7 +728,8 @@ function dot(){
 function statusLine(){
   const ready = Object.entries(state.sources).filter(([,v]) => v).length;
   const total = Object.keys(state.sources).length;
-  els.sourceState.textContent = `Sources: ${ready}/${total} online`;
+  const pulse = ready === total ? '' : 'offline';
+  els.sourceState.innerHTML = `<span class="pulse ${pulse}"></span>Sources: ${ready}/${total} online`;
 }
 
 function updateLastUpdate(){
@@ -639,9 +753,8 @@ function updateRisk(){
   els.alert.style.display = risk > 80 ? 'block' : 'none';
   els.summary.textContent = `KP ${state.kp.toFixed(1)} | Lightning ${state.lightning} | Risk ${risk.toFixed(1)}`;
   els.riskDetail.textContent = state.weatherOk
-    ? 'Live sources updated automatically.'
+    ? 'Live sources updated automatically. Risk uses NOAA space-weather input plus a smoothed history.'
     : 'Some sources unavailable; values are safely zeroed.';
-
   if (risk > 60) dot();
 }
 
@@ -665,25 +778,29 @@ function lightningScoreFromKp(kp){
   return 0.90;
 }
 
+function renderCard(el, title, lines){
+  el.innerHTML = `<span class="label">${title}</span>` + lines.map((line, i) =>
+    i === 0 ? `${line}` : `<div class="subrow">${line}</div>`
+  ).join('');
+}
+
 async function loadWeather(){
   try{
     const d = await fetchJSON(CONFIG.weatherUrl);
     const w = d?.current;
     if (!w) throw new Error('no weather');
-
     const temp = w.temperature_2m ?? '?';
     const wind = w.wind_speed_10m ?? '?';
     const code = w.weather_code;
-
-    els.weather.innerHTML =
-      `<span class="label">Weather</span>${temp}°F | Wind ${wind} mph` +
-      (code !== undefined ? `<br><span class="small">${wmoLabel(code)}</span>` : '') +
-      (d?.timezone ? `<br><span class="small">${d.timezone}</span>` : '');
-
+    renderCard(els.weather, 'Weather', [
+      `${temp}°F | Wind ${wind} mph`,
+      code !== undefined ? `<span class="small">${wmoLabel(code)}</span>` : '',
+      d?.timezone ? `<span class="small">${d.timezone}</span>` : ''
+    ].filter(Boolean));
     state.weatherOk = true;
     state.sources.weather = true;
   }catch{
-    els.weather.innerHTML = '<span class="label">Weather</span>Offline';
+    renderCard(els.weather, 'Weather', ['Offline']);
     state.weatherOk = false;
     state.sources.weather = false;
   }
@@ -695,10 +812,12 @@ async function loadSpace(){
     const last = Array.isArray(j) ? j[j.length - 1] : null;
     state.kp = safeNum(last?.estimated_kp ?? last?.kp_index, 0);
     state.lightningScore = lightningScoreFromKp(state.kp);
+    state.lightning = Math.round(state.lightningScore * 100);
     state.sources.space = true;
   }catch{
     state.kp = 0;
     state.lightningScore = 0.05;
+    state.lightning = 5;
     state.sources.space = false;
   }
 }
@@ -708,11 +827,13 @@ async function loadISS(){
     const d = await fetchJSON(CONFIG.issUrl);
     const alt = Math.round(safeNum(d?.altitude, 0));
     const vel = Math.round(safeNum(d?.velocity, 0));
-    els.iss.innerHTML =
-      `<span class="label">ISS</span>${alt} km altitude<br><span class="small">${vel} km/h</span>`;
+    renderCard(els.iss, 'ISS', [
+      `${alt} km altitude`,
+      `<span class="small">${vel} km/h</span>`
+    ]);
     state.sources.iss = true;
   }catch{
-    els.iss.innerHTML = '<span class="label">ISS</span>Offline';
+    renderCard(els.iss, 'ISS', ['Offline']);
     state.sources.iss = false;
   }
 }
@@ -725,10 +846,13 @@ async function loadQuake(){
     const mag = safeNum(q?.properties?.mag, 0).toFixed(1);
     const place = q?.properties?.place || 'Unknown location';
     const time = q?.properties?.time ? new Date(q.properties.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
-    els.quake.innerHTML = `<span class="label">Quake</span>M ${mag}<br><span class="small">${place}${time ? ' · ' + time : ''}</span>`;
+    renderCard(els.quake, 'Quake', [
+      `M ${mag}`,
+      `<span class="small">${place}${time ? ' · ' + time : ''}</span>`
+    ]);
     state.sources.quake = true;
   }catch{
-    els.quake.innerHTML = '<span class="label">Quake</span>Offline';
+    renderCard(els.quake, 'Quake', ['Offline']);
     state.sources.quake = false;
   }
 }
@@ -739,12 +863,24 @@ async function loadNet(){
     const desc = d?.status?.description || 'OK';
     const indicator = d?.status?.indicator || 'none';
     const cls = indicator === 'none' ? 'status-ok' : (indicator === 'minor' ? 'status-warn' : 'status-bad');
-    els.net.innerHTML = `<span class="label">Network</span><span class="${cls}">${desc}</span><br><span class="small">${indicator}</span>`;
+    renderCard(els.net, 'Network', [
+      `<span class="${cls}">${desc}</span>`,
+      `<span class="small">${indicator}</span>`
+    ]);
     state.sources.net = true;
   }catch{
-    els.net.innerHTML = '<span class="label">Network</span>Offline';
+    renderCard(els.net, 'Network', ['Offline']);
     state.sources.net = false;
   }
+}
+
+function formatNASAEvent(e){
+  const title = e?.title || 'Untitled event';
+  const closed = e?.closed ? new Date(e.closed).toLocaleDateString([], {month:'short', day:'numeric'}) : 'Open';
+  const cat = Array.isArray(e?.categories) && e.categories.length ? e.categories.map(c => c.title || c.id || 'Event').join(', ') : 'Event';
+  const geometry = Array.isArray(e?.geometry) && e.geometry.length ? e.geometry[e.geometry.length - 1] : null;
+  const when = geometry?.date ? new Date(geometry.date).toLocaleDateString([], {month:'short', day:'numeric'}) : '';
+  return { title, closed, cat, when };
 }
 
 async function loadNASA(){
@@ -753,14 +889,15 @@ async function loadNASA(){
     const ev = Array.isArray(d?.events) ? d.events.slice(0,5) : [];
     const titles = [...new Set(ev.map(e => e.title).filter(Boolean))];
     els.nasaTrack.textContent = titles.length ? titles.join(' ⚫ ') : 'NASA: no current events';
-
     ev.forEach(e => {
-      const t = String(e.title || '').toLowerCase();
-      if (t.includes('fire')) addIncident(e.title, 'CRITICAL');
-      else if (t.includes('storm') || t.includes('flood') || t.includes('hurricane') || t.includes('cyclone') || t.includes('typhoon')) addIncident(e.title, 'WARNING');
-      else addIncident(e.title, 'INFO');
+      const f = formatNASAEvent(e);
+      const key = e?.id ? `nasa-${e.id}` : `nasa-${f.title}-${f.closed}`;
+      const t = String(f.title).toLowerCase();
+      const line = `${f.title} · ${f.cat} · ${f.closed}${f.when ? ' · ' + f.when : ''}`;
+      if (t.includes('fire')) addIncident(line, 'CRITICAL', key);
+      else if (t.includes('storm') || t.includes('flood') || t.includes('hurricane') || t.includes('cyclone') || t.includes('typhoon')) addIncident(line, 'WARNING', key);
+      else addIncident(line, 'INFO', key);
     });
-
     state.sources.nasa = true;
   }catch{
     els.nasaTrack.textContent = 'NASA OFFLINE';
@@ -786,7 +923,21 @@ function tick(){
   updateLastUpdate();
 }
 
+function applyTheme(){
+  document.body.classList.toggle('theme-alt', state.themeAlt);
+  els.themeBtn.textContent = state.themeAlt ? 'Theme: Alt' : 'Theme: Base';
+}
+
+function applyMotion(){
+  els.motionBtn.textContent = state.motionEnabled ? 'Motion: On' : 'Motion: Off';
+  document.querySelectorAll('.track').forEach(el => {
+    el.style.animationPlayState = state.motionEnabled ? 'running' : 'paused';
+  });
+}
+
 async function start(){
+  applyTheme();
+  applyMotion();
   await Promise.allSettled([
     loadSpace(),
     loadWeather(),
@@ -799,19 +950,27 @@ async function start(){
   updateRisk();
   statusLine();
   updateLastUpdate();
-
   setInterval(loadSpace, 3000);
-  setInterval(() => { state.lightning = Math.round(state.kp * 5); }, 3000);
-  setInterval(tick, 3000);
   setInterval(loadWeather, 60000);
   setInterval(loadISS, 30000);
   setInterval(loadQuake, 300000);
   setInterval(loadNet, 60000);
   setInterval(loadNASA, 120000);
   setInterval(loadJSON, 60000);
+  setInterval(() => { state.lightning = Math.round(state.lightningScore * 100); }, 3000);
+  setInterval(tick, 3000);
+  setInterval(dot, 3000);
 }
 
 els.clearIncidents.addEventListener('click', clearIncidents);
+els.themeBtn.addEventListener('click', () => {
+  state.themeAlt = !state.themeAlt;
+  applyTheme();
+});
+els.motionBtn.addEventListener('click', () => {
+  state.motionEnabled = !state.motionEnabled;
+  applyMotion();
+});
 
 start();
 </script>
