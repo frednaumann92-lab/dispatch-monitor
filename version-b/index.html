@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tactical Command System v4.5</title>
+<style>
+:root{
+  --bg:#030506;
+  --bg2:#071015;
+  --panel:rgba(10,16,20,.92);
+  --panel2:#0d1418;
+  --line:#1b2a30;
+  --line2:#22404a;
+  --accent:#00ffd5;
+  --accent2:#4be6ff;
+  --danger:#ff3b3b;
+  --warn:#ffb020;
+  --ok:#37ff7a;
+  --text:#d7f4ff;
+  --muted:#8ca4b0;
+  --shadow:0 0 0 1px rgba(255,255,255,.02), 0 12px 30px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  overflow:hidden;
+  color:var(--text);
+  font-family:Consolas, Monaco, 'Courier New', monospace;
+  background:
+    radial-gradient(circle at top, rgba(0,255,213,.10), transparent 30%),
+    radial-gradient(circle at bottom, rgba(75,230,255,.08), transparent 35%),
+    linear-gradient(180deg, #000 0%, var(--bg) 100%);
+}
+
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,255,213,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,213,.03) 1px, transparent 1px);
+  background-size:24px 24px;
+  mask-image: radial-gradient(circle at center, rgba(0,0,0,.85), transparent 85%);
+  opacity:.55;
+}
+
+#alert{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:9999;
+  display:none;
+  padding:10px 12px;
+  text-align:center;
+  font-weight:700;
+  color:#fff;
+  letter-spacing:.8px;
+  background:linear-gradient(90deg, #a30000, var(--danger), #a30000);
+  animation:flash 1s infinite;
+  box-shadow:0 0 30px rgba(255,59,59,.35);
+}
+
+@keyframes flash{
+  0%,100%{opacity:1;}
+  50%{opacity:.35;}
+}
+
+#header{
+  height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 14px;
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(0,0,0,.92), rgba(6,10,12,.9));
+  color:var(--accent);
+  font-weight:700;
+  letter-spacing:.6px;
+  box-shadow:var(--shadow);
+  position:relative;
+  z-index:10;
+}
+
+#header .title{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  flex-wrap:wrap;
+}
+
+#header .badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 8px;
+  border:1px solid var(--line2);
+  border-radius:999px;
+  color:var(--accent2);
+  background:rgba(0,255,213,.05);
+  font-size:11px;
+}
+
+#headerTime{
+  color:var(--text);
+  font-variant-numeric:tabular-nums;
+  font-size:14px;
+  white-space:nowrap;
+}
+
+#grid{
+  display:grid;
+  grid-template-columns:minmax(320px,36%) minmax(0,64%);
+  gap:10px;
+  height:calc(100vh - 92px);
+  padding:10px;
+}
+
+.panel{
+  border:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(13,20,24,.96), rgba(5,8,10,.98));
+  box-shadow:var(--shadow);
+  overflow:auto;
+  min-width:0;
+  scrollbar-color:#27414a #081115;
+}
+
+#left{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding:10px;
+}
+
+#panelTime{
+  font-size:clamp(1.6rem, 2.4vw, 2.8rem);
+  color:var(--accent);
+  line-height:1;
+  text-shadow:0 0 18px rgba(0,255,213,.18);
+  font-variant-numeric:tabular-nums;
+}
+
+#summary{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+  padding:10px;
+  font-size:12px;
+  color:var(--muted);
+  border-radius:6px;
+  min-height:42px;
+}
+
+#metaLine{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+  padding:8px 10px;
+  font-size:11px;
+  color:var(--muted);
+  border-radius:6px;
+}
+
+#forecast{
+  border:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+  padding:10px;
+  border-radius:6px;
+  display:grid;
+  gap:8px;
+}
+
+#forecast .row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.bar{
+  height:12px;
+  background:#091114;
+  border:1px solid #172429;
+  border-radius:999px;
+  overflow:hidden;
+}
+
+.fill{
+  height:100%;
+  width:0%;
+  transition:width .45s ease, background-color .45s ease;
+  background:var(--ok);
+  box-shadow:0 0 12px rgba(55,255,122,.25);
+}
+
+.small{
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.45;
+}
+
+#incidentHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 2px;
+  color:var(--muted);
+  font-size:12px;
+  letter-spacing:.5px;
+}
+
+#incidentActions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+button{
+  appearance:none;
+  border:1px solid var(--line2);
+  background:rgba(0,255,213,.05);
+  color:var(--accent2);
+  padding:6px 10px;
+  border-radius:6px;
+  font:inherit;
+  font-size:11px;
+  cursor:pointer;
+}
+
+button:hover{
+  background:rgba(0,255,213,.12);
+}
+
+#incidents{
+  display:grid;
+  gap:6px;
+}
+
+.incident{
+  padding:8px 9px;
+  font-size:12px;
+  background:rgba(255,255,255,.02);
+  border:1px solid var(--line);
+  border-radius:6px;
+}
+
+.CRITICAL{border-left:4px solid var(--danger);}
+.WARNING{border-left:4px solid var(--warn);}
+.INFO{border-left:4px solid var(--accent);}
+
+#right{
+  display:grid;
+  grid-template-rows:42vh 24vh 1fr;
+  gap:10px;
+  min-width:0;
+}
+
+#radarWrap,
+#map{
+  position:relative;
+  border:1px solid var(--line);
+  background:#000;
+  overflow:hidden;
+  border-radius:6px;
+  box-shadow:var(--shadow);
+}
+
+#radar{
+  width:100%;
+  height:100%;
+  border:0;
+  display:block;
+}
+
+#map{
+  background:
+    radial-gradient(circle at center, rgba(0,255,213,.05), transparent 40%),
+    radial-gradient(circle, #001018, #000 75%);
+}
+
+#map::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(rgba(0,255,213,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,213,.05) 1px, transparent 1px);
+  background-size:32px 32px;
+  opacity:.25;
+  pointer-events:none;
+}
+
+.dot{
+  position:absolute;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  animation:fade 2.8s linear forwards;
+  box-shadow:0 0 10px currentColor;
+}
+
+@keyframes fade{
+  from{opacity:1;transform:scale(1);}
+  to{opacity:0;transform:scale(2.5);}
+}
+
+#info{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:10px;
+  min-height:0;
+}
+
+.card{
+  border:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+  border-radius:6px;
+  padding:10px;
+  font-size:12px;
+  min-height:96px;
+  overflow:hidden;
+}
+
+.card .label{
+  display:block;
+  color:var(--muted);
+  margin-bottom:6px;
+  text-transform:uppercase;
+  letter-spacing:.7px;
+  font-size:11px;
+}
+
+.ticker{
+  position:fixed;
+  left:0;
+  width:100%;
+  height:40px;
+  display:flex;
+  align-items:center;
+  overflow:hidden;
+  background:rgba(0,0,0,.96);
+  border-top:1px solid var(--line);
+  z-index:1000;
+}
+
+.track{
+  display:inline-block;
+  padding-left:100%;
+  white-space:nowrap;
+  animation:scroll 28s linear infinite;
+  color:var(--accent);
+}
+
+@keyframes scroll{
+  from{transform:translateX(0);}
+  to{transform:translateX(-100%);}
+}
+
+#jsonBar{bottom:40px;}
+#nasaBar{bottom:0;}
+
+.status-ok{color:var(--ok);}
+.status-warn{color:var(--warn);}
+.status-bad{color:var(--danger);}
+
+@media (max-width: 1100px){
+  body{overflow:auto;}
+  #grid{
+    grid-template-columns:1fr;
+    height:auto;
+  }
+  #right{
+    grid-template-rows:320px 220px auto;
+  }
+  #info{
+    grid-template-columns:1fr;
+  }
+  #panelTime{
+    font-size:2rem;
+  }
+}
+
+@media (max-width: 700px){
+  #header{
+    height:auto;
+    padding:10px 12px;
+    gap:8px;
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  #headerTime{
+    font-size:12px;
+  }
+  #grid{
+    padding:8px;
+    gap:8px;
+  }
+  #left{
+    padding:8px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="alert">⚠ SYSTEM ESCALATION</div>
+
+<div id="header">
+  <div class="title">
+    <span>TACTICAL COMMAND v4.5</span>
+    <span class="badge">COMMAND CENTER</span>
+  </div>
+  <div id="headerTime"></div>
+</div>
+
+<div id="grid">
+  <div class="panel" id="left">
+    <div id="panelTime">--:--:--</div>
+
+    <div id="metaLine">
+      <div id="lastUpdated">Last update: --</div>
+      <div id="sourceState">Sources: initializing</div>
+    </div>
+
+    <div id="summary">System initializing...</div>
+
+    <div id="forecast">
+      <div class="row">
+        <div>RISK: <span id="risk">0</span>/100</div>
+        <div class="small" id="riskLabel">LOW</div>
+      </div>
+      <div class="bar"><div class="fill" id="fill"></div></div>
+      <div class="small" id="riskDetail">Waiting for live data...</div>
+    </div>
+
+    <div id="incidentHeader">
+      <span>INCIDENT LOG</span>
+      <div id="incidentActions">
+        <span id="incidentCount">0</span>
+        <button id="clearIncidents" type="button">Clear</button>
+      </div>
+    </div>
+    <div id="incidents"></div>
+  </div>
+
+  <div id="right">
+    <div id="radarWrap">
+      <iframe
+        id="radar"
+        title="Radar"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+        src="https://embed.windy.com/embed2.html?lat=39.9&lon=-96.4&zoom=6&overlay=radar">
+      </iframe>
+    </div>
+
+    <div id="map" aria-label="Live activity map"></div>
+
+    <div id="info">
+      <div class="card" id="weather"><span class="label">Weather</span>Loading...</div>
+      <div class="card" id="iss"><span class="label">ISS</span>Loading...</div>
+      <div class="card" id="quake"><span class="label">Quake</span>Loading...</div>
+      <div class="card" id="net"><span class="label">Network</span>Loading...</div>
+    </div>
+  </div>
+</div>
+
+<div id="jsonBar" class="ticker"><div class="track" id="jsonTrack">Loading ops feed...</div></div>
+<div id="nasaBar" class="ticker"><div class="track" id="nasaTrack">Loading NASA feed...</div></div>
+
+<script>
+const CONFIG = {
+  lat: 40.2681,
+  lon: -96.7467,
+  weatherUrl: 'https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current=true&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto',
+  kpUrl: 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json',
+  issUrl: 'https://api.wheretheiss.at/v1/satellites/25544',
+  quakeUrl: 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&orderby=time',
+  netUrl: 'https://www.cloudflarestatus.com/api/v2/summary.json',
+  nasaUrl: 'https://eonet.gsfc.nasa.gov/api/v3/events',
+  opsUrl: 'ops-feed.json?_='
+};
+
+const state = {
+  kp: 0,
+  lightning: 0,
+  lightningScore: 0,
+  risk: 0,
+  history: [],
+  weatherOk: false,
+  sources: {
+    weather: false,
+    space: false,
+    iss: false,
+    quake: false,
+    net: false,
+    nasa: false,
+    ops: false
+  },
+  lastUpdate: null
+};
+
+const els = {
+  headerTime: document.getElementById('headerTime'),
+  panelTime: document.getElementById('panelTime'),
+  summary: document.getElementById('summary'),
+  risk: document.getElementById('risk'),
+  riskLabel: document.getElementById('riskLabel'),
+  fill: document.getElementById('fill'),
+  alert: document.getElementById('alert'),
+  riskDetail: document.getElementById('riskDetail'),
+  incidents: document.getElementById('incidents'),
+  incidentCount: document.getElementById('incidentCount'),
+  map: document.getElementById('map'),
+  weather: document.getElementById('weather'),
+  iss: document.getElementById('iss'),
+  quake: document.getElementById('quake'),
+  net: document.getElementById('net'),
+  nasaTrack: document.getElementById('nasaTrack'),
+  jsonTrack: document.getElementById('jsonTrack'),
+  lastUpdated: document.getElementById('lastUpdated'),
+  sourceState: document.getElementById('sourceState'),
+  clearIncidents: document.getElementById('clearIncidents')
+};
+
+function nowTime(){
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+function stampTime(){
+  return new Date().toLocaleString([], {
+    month:'short',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit',
+    second:'2-digit'
+  });
+}
+
+function updateClock(){
+  const t = nowTime();
+  els.headerTime.textContent = t;
+  els.panelTime.textContent = t;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+function safeNum(v, d=0){
+  v = Number(v);
+  return Number.isFinite(v) ? v : d;
+}
+
+function wmoLabel(code){
+  const map = {
+    0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
+    45:'Fog', 48:'Rime fog', 51:'Light drizzle', 53:'Drizzle', 55:'Dense drizzle',
+    56:'Freezing drizzle', 57:'Freezing drizzle',
+    61:'Light rain', 63:'Rain', 65:'Heavy rain',
+    66:'Freezing rain', 67:'Freezing rain',
+    71:'Light snow', 73:'Snow', 75:'Heavy snow',
+    77:'Snow grains',
+    80:'Rain showers', 81:'Rain showers', 82:'Violent showers',
+    85:'Snow showers', 86:'Snow showers',
+    95:'Thunderstorm', 96:'Thunderstorm hail', 99:'Thunderstorm hail'
+  };
+  return map[code] || `WMO ${code}`;
+}
+
+function riskColor(risk){
+  if (risk < 30) return '#37ff7a';
+  if (risk < 70) return '#ffb020';
+  return '#ff3b3b';
+}
+
+function riskText(risk){
+  if (risk < 30) return 'LOW';
+  if (risk < 70) return 'ELEVATED';
+  return 'HIGH';
+}
+
+function addIncident(text, type='INFO'){
+  const d = document.createElement('div');
+  d.className = `incident ${type}`;
+  d.textContent = text;
+  els.incidents.prepend(d);
+  while (els.incidents.children.length > 10) els.incidents.removeChild(els.incidents.lastChild);
+  els.incidentCount.textContent = els.incidents.children.length;
+}
+
+function clearIncidents(){
+  els.incidents.innerHTML = '';
+  els.incidentCount.textContent = '0';
+}
+
+function dot(){
+  const d = document.createElement('div');
+  d.className = 'dot';
+  d.style.left = Math.random() * 100 + '%';
+  d.style.top = Math.random() * 100 + '%';
+  const colors = ['red', 'orange', 'cyan'];
+  d.style.color = d.style.background = colors[Math.floor(Math.random() * colors.length)];
+  els.map.appendChild(d);
+  setTimeout(() => d.remove(), 2800);
+}
+
+function statusLine(){
+  const ready = Object.entries(state.sources).filter(([,v]) => v).length;
+  const total = Object.keys(state.sources).length;
+  els.sourceState.textContent = `Sources: ${ready}/${total} online`;
+}
+
+function updateLastUpdate(){
+  state.lastUpdate = stampTime();
+  els.lastUpdated.textContent = `Last update: ${state.lastUpdate}`;
+}
+
+function updateRisk(){
+  const base = (state.kp * 14) + (state.lightningScore * 18);
+  state.history.push(base);
+  if (state.history.length > 12) state.history.shift();
+
+  const avg = state.history.reduce((a, b) => a + b, 0) / state.history.length;
+  state.risk = state.risk * 0.72 + avg * 0.28;
+
+  const risk = Math.max(0, Math.min(100, state.risk));
+  els.risk.textContent = Math.round(risk);
+  els.riskLabel.textContent = riskText(risk);
+  els.fill.style.width = risk + '%';
+  els.fill.style.background = riskColor(risk);
+  els.alert.style.display = risk > 80 ? 'block' : 'none';
+  els.summary.textContent = `KP ${state.kp.toFixed(1)} | Lightning ${state.lightning} | Risk ${risk.toFixed(1)}`;
+  els.riskDetail.textContent = state.weatherOk
+    ? 'Live sources updated automatically.'
+    : 'Some sources unavailable; values are safely zeroed.';
+
+  if (risk > 60) dot();
+}
+
+async function fetchJSON(url, timeout=10000){
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try{
+    const r = await fetch(url, {signal: controller.signal, cache:'no-store'});
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+function lightningScoreFromKp(kp){
+  if (kp < 2) return 0.05;
+  if (kp < 4) return 0.20;
+  if (kp < 6) return 0.45;
+  if (kp < 7) return 0.65;
+  return 0.90;
+}
+
+async function loadWeather(){
+  try{
+    const d = await fetchJSON(CONFIG.weatherUrl);
+    const w = d?.current;
+    if (!w) throw new Error('no weather');
+
+    const temp = w.temperature_2m ?? '?';
+    const wind = w.wind_speed_10m ?? '?';
+    const code = w.weather_code;
+
+    els.weather.innerHTML =
+      `<span class="label">Weather</span>${temp}°F | Wind ${wind} mph` +
+      (code !== undefined ? `<br><span class="small">${wmoLabel(code)}</span>` : '') +
+      (d?.timezone ? `<br><span class="small">${d.timezone}</span>` : '');
+
+    state.weatherOk = true;
+    state.sources.weather = true;
+  }catch{
+    els.weather.innerHTML = '<span class="label">Weather</span>Offline';
+    state.weatherOk = false;
+    state.sources.weather = false;
+  }
+}
+
+async function loadSpace(){
+  try{
+    const j = await fetchJSON(CONFIG.kpUrl);
+    const last = Array.isArray(j) ? j[j.length - 1] : null;
+    state.kp = safeNum(last?.estimated_kp ?? last?.kp_index, 0);
+    state.lightningScore = lightningScoreFromKp(state.kp);
+    state.sources.space = true;
+  }catch{
+    state.kp = 0;
+    state.lightningScore = 0.05;
+    state.sources.space = false;
+  }
+}
+
+async function loadISS(){
+  try{
+    const d = await fetchJSON(CONFIG.issUrl);
+    const alt = Math.round(safeNum(d?.altitude, 0));
+    const vel = Math.round(safeNum(d?.velocity, 0));
+    els.iss.innerHTML =
+      `<span class="label">ISS</span>${alt} km altitude<br><span class="small">${vel} km/h</span>`;
+    state.sources.iss = true;
+  }catch{
+    els.iss.innerHTML = '<span class="label">ISS</span>Offline';
+    state.sources.iss = false;
+  }
+}
+
+async function loadQuake(){
+  try{
+    const d = await fetchJSON(CONFIG.quakeUrl);
+    const q = d?.features?.[0];
+    if (!q) throw new Error('no quake');
+    const mag = safeNum(q?.properties?.mag, 0).toFixed(1);
+    const place = q?.properties?.place || 'Unknown location';
+    const time = q?.properties?.time ? new Date(q.properties.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    els.quake.innerHTML = `<span class="label">Quake</span>M ${mag}<br><span class="small">${place}${time ? ' · ' + time : ''}</span>`;
+    state.sources.quake = true;
+  }catch{
+    els.quake.innerHTML = '<span class="label">Quake</span>Offline';
+    state.sources.quake = false;
+  }
+}
+
+async function loadNet(){
+  try{
+    const d = await fetchJSON(CONFIG.netUrl);
+    const desc = d?.status?.description || 'OK';
+    const indicator = d?.status?.indicator || 'none';
+    const cls = indicator === 'none' ? 'status-ok' : (indicator === 'minor' ? 'status-warn' : 'status-bad');
+    els.net.innerHTML = `<span class="label">Network</span><span class="${cls}">${desc}</span><br><span class="small">${indicator}</span>`;
+    state.sources.net = true;
+  }catch{
+    els.net.innerHTML = '<span class="label">Network</span>Offline';
+    state.sources.net = false;
+  }
+}
+
+async function loadNASA(){
+  try{
+    const d = await fetchJSON(CONFIG.nasaUrl);
+    const ev = Array.isArray(d?.events) ? d.events.slice(0,5) : [];
+    const titles = [...new Set(ev.map(e => e.title).filter(Boolean))];
+    els.nasaTrack.textContent = titles.length ? titles.join(' ⚫ ') : 'NASA: no current events';
+
+    ev.forEach(e => {
+      const t = String(e.title || '').toLowerCase();
+      if (t.includes('fire')) addIncident(e.title, 'CRITICAL');
+      else if (t.includes('storm') || t.includes('flood') || t.includes('hurricane') || t.includes('cyclone') || t.includes('typhoon')) addIncident(e.title, 'WARNING');
+      else addIncident(e.title, 'INFO');
+    });
+
+    state.sources.nasa = true;
+  }catch{
+    els.nasaTrack.textContent = 'NASA OFFLINE';
+    state.sources.nasa = false;
+  }
+}
+
+async function loadJSON(){
+  try{
+    const d = await fetchJSON(CONFIG.opsUrl + Date.now());
+    const msgs = Array.isArray(d?.messages) ? d.messages : [];
+    els.jsonTrack.textContent = msgs.length ? ('OPS ' + msgs.join(' ⚪ ')) : 'OPS NO DATA';
+    state.sources.ops = true;
+  }catch{
+    els.jsonTrack.textContent = 'OFFLINE';
+    state.sources.ops = false;
+  }
+}
+
+function tick(){
+  updateRisk();
+  statusLine();
+  updateLastUpdate();
+}
+
+async function start(){
+  await Promise.allSettled([
+    loadSpace(),
+    loadWeather(),
+    loadISS(),
+    loadQuake(),
+    loadNet(),
+    loadNASA(),
+    loadJSON()
+  ]);
+  updateRisk();
+  statusLine();
+  updateLastUpdate();
+
+  setInterval(loadSpace, 3000);
+  setInterval(() => { state.lightning = Math.round(state.kp * 5); }, 3000);
+  setInterval(tick, 3000);
+  setInterval(loadWeather, 60000);
+  setInterval(loadISS, 30000);
+  setInterval(loadQuake, 300000);
+  setInterval(loadNet, 60000);
+  setInterval(loadNASA, 120000);
+  setInterval(loadJSON, 60000);
+}
+
+els.clearIncidents.addEventListener('click', clearIncidents);
+
+start();
+</script>
+</body>
+</html>
