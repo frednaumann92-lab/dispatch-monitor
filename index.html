@@ -207,6 +207,13 @@
             line-height: 1.4;
         }
 
+        /* Enlarged font style for River Hydrology & Surface Conditions */
+        .telemetry-row.enlarged {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 2px 0;
+        }
+
         .label { color: rgba(0, 255, 102, 0.65); }
         .val { color: #ffffff; text-shadow: 0 0 5px rgba(0, 255, 102, 0.4); }
 
@@ -363,39 +370,58 @@
                 <div id="alert-details" style="color: rgba(255,255,255,0.7);">Targeting Gage County sector for active weather hazards.</div>
             </div>
 
-            <!-- USGS Hydrology Monitor -->
+            <!-- USGS Hydrology Monitor (Enlarged) -->
             <div class="panel-header" style="margin-top: 8px;">
                 <span>USGS RIVER HYDROLOGY</span>
                 <span id="usgs-status" style="color:#00ff66;">SYNCING</span>
             </div>
-            <div class="telemetry-row"><span class="label">LOCATION:</span><span class="val">BIG BLUE RIVER AT BEATRICE</span></div>
-            <div class="telemetry-row"><span class="label">GAUGE HEIGHT:</span><span id="river-stage" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">ACTION STAGE:</span><span class="val" style="color:#ffaa00;">14.0 FT</span></div>
-            <div class="telemetry-row"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
+            <div class="telemetry-row enlarged"><span class="label">LOCATION:</span><span class="val">BIG BLUE RIVER AT BEATRICE</span></div>
+            <div class="telemetry-row enlarged"><span class="label">GAUGE HEIGHT:</span><span id="river-stage" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">ACTION STAGE:</span><span class="val" style="color:#ffaa00;">14.0 FT</span></div>
+            <div class="telemetry-row enlarged"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
 
-            <!-- Surface Conditions -->
+            <!-- Surface Conditions (Enlarged) -->
             <div class="panel-header" style="margin-top: 8px;">
                 <span>SURFACE CONDITIONS</span>
                 <span id="weather-status" style="color:#00ff66;">CONNECTING</span>
             </div>
 
-            <div class="telemetry-row"><span class="label">TEMPERATURE:</span><span id="weather-temp" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">FEELS LIKE:</span><span id="weather-feels" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">HUMIDITY:</span><span id="weather-humidity" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">WIND VECTOR:</span><span id="weather-wind" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">WIND GUSTS:</span><span id="weather-gusts" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">CLOUD COVER:</span><span id="weather-cloud" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">PRECIPITATION:</span><span id="weather-precip" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">BARO PRESSURE:</span><span id="weather-baro" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">TEMPERATURE:</span><span id="weather-temp" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">FEELS LIKE:</span><span id="weather-feels" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">HUMIDITY:</span><span id="weather-humidity" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">WIND VECTOR:</span><span id="weather-wind" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">WIND GUSTS:</span><span id="weather-gusts" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">CLOUD COVER:</span><span id="weather-cloud" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">PRECIPITATION:</span><span id="weather-precip" class="val">FETCHING...</span></div>
+            <div class="telemetry-row enlarged"><span class="label">BARO PRESSURE:</span><span id="weather-baro" class="val">FETCHING...</span></div>
         </div>
 
-        <!-- Right Sector Nodes Panel -->
+        <!-- Right Sector Nodes & Local Clock Panel -->
         <div class="hud-panel hud-right">
             <div class="panel-header">
                 <span>SECTOR TARGET NODES</span>
                 <button class="btn-toggle" style="font-size: 9px; padding: 2px 6px;" onclick="resetMapFocus()">RESET HQ</button>
             </div>
             <div id="node-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+
+            <!-- Central Time Military Clock Module -->
+            <div class="panel-header" style="margin-top: 10px;">
+                <span>CENTRAL TIME (LOCAL)</span>
+            </div>
+            <div style="background: rgba(0, 255, 102, 0.04); border: 1px solid rgba(0, 255, 102, 0.15); padding: 8px 10px; border-radius: 3px; display: flex; flex-direction: column; gap: 4px;">
+                <div class="telemetry-row">
+                    <span class="label">MIL READOUT:</span>
+                    <span id="central-mil-clock" class="val" style="font-weight: 800; color: #fff; font-size: 12px;">000000H</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="label">TIMEZONE:</span>
+                    <span id="central-zone-label" class="val">24H / CDT</span>
+                </div>
+                <div class="telemetry-row">
+                    <span class="label">LOCAL DATE:</span>
+                    <span id="central-date" class="val">----</span>
+                </div>
+            </div>
         </div>
 
         <!-- Footer -->
@@ -1103,10 +1129,35 @@
             requestAnimationFrame(renderRadar);
         }
 
-        // Clock Update Loop
+        // Clock Update Loop (UTC and Central Time Military Clock)
         setInterval(() => {
             const now = new Date();
             document.getElementById('utc-clock').innerText = now.toISOString().replace('T', ' ').substring(11, 19) + " UTC";
+
+            // Central Time Military Clock update
+            try {
+                const tzOptions = { timeZone: 'America/Chicago', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                const timeParts = new Intl.DateTimeFormat('en-US', tzOptions).formatToParts(now);
+                let hour = timeParts.find(p => p.type === 'hour')?.value || '00';
+                let minute = timeParts.find(p => p.type === 'minute')?.value || '00';
+                let second = timeParts.find(p => p.type === 'second')?.value || '00';
+                
+                const zoneParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', timeZoneName: 'short' }).formatToParts(now);
+                const zoneName = zoneParts.find(p => p.type === 'timeZoneName')?.value || 'CT';
+
+                const dateOptions = { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' };
+                const dateStr = new Intl.DateTimeFormat('en-US', dateOptions).format(now);
+
+                const milClockEl = document.getElementById('central-mil-clock');
+                const zoneEl = document.getElementById('central-zone-label');
+                const dateEl = document.getElementById('central-date');
+
+                if (milClockEl) milClockEl.innerText = `${hour}${minute}${second}H`;
+                if (zoneEl) zoneEl.innerText = `24H / ${zoneName}`;
+                if (dateEl) dateEl.innerText = dateStr;
+            } catch (e) {
+                console.warn('Central clock update error:', e);
+            }
 
             const syncEl = document.getElementById('radar-sync-time');
             if (syncEl) {
