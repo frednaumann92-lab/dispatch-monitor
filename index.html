@@ -17,13 +17,14 @@
             --green: #00ff66;
             --green-dim: rgba(0, 255, 102, 0.25);
             --bg-dark: #04080c;
-            --panel-bg: rgba(6, 12, 18, 0.92);
+            --panel-bg: rgba(6, 12, 18, 0.94);
             --border-line: rgba(0, 255, 102, 0.35);
             --alert-red: #ff3344;
             --alert-orange: #ffaa00;
             --alert-yellow: #ffff00;
             --water-blue: #00ccff;
             --text-dim: rgba(255, 255, 255, 0.7);
+            --tv-scale: 1.15; /* Base scale boost for distant TV viewing */
         }
 
         * {
@@ -40,6 +41,17 @@
             font-family: 'JetBrains Mono', monospace;
             overflow: hidden;
             user-select: none;
+            font-size: calc(13px * var(--tv-scale));
+        }
+
+        body.high-vis {
+            --border-line: rgba(0, 255, 102, 0.75);
+            --panel-bg: rgba(2, 6, 10, 0.98);
+        }
+
+        body.high-vis .val {
+            text-shadow: 0 0 8px rgba(0, 255, 102, 0.8);
+            font-weight: 800;
         }
 
         #viewport {
@@ -60,8 +72,8 @@
         }
 
         .road-tile-layer {
-            filter: brightness(2.5) contrast(1.6) invert(10%) drop-shadow(0px 0px 1px rgba(0,255,102,0.4));
-            opacity: 0.85 !important;
+            filter: brightness(2.8) contrast(1.8) invert(10%) drop-shadow(0px 0px 2px rgba(0,255,102,0.6));
+            opacity: 0.9 !important;
             z-index: 150 !important;
         }
 
@@ -84,10 +96,10 @@
             z-index: 1000;
             pointer-events: none;
             display: grid;
-            grid-template-rows: 55px 1fr 35px;
-            grid-template-columns: 340px 1fr 340px;
-            padding: 12px;
-            gap: 12px;
+            grid-template-rows: 65px 1fr 40px;
+            grid-template-columns: 380px 1fr 380px;
+            padding: 14px;
+            gap: 14px;
         }
 
         .hud-panel {
@@ -95,7 +107,7 @@
             border: 1px solid var(--border-line);
             border-radius: 4px;
             backdrop-filter: blur(8px);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.9);
             pointer-events: auto;
         }
 
@@ -104,31 +116,31 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 18px;
+            padding: 0 20px;
         }
 
         .sys-title {
-            font-size: 14px;
+            font-size: calc(15px * var(--tv-scale));
             font-weight: 800;
             letter-spacing: 2px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             color: #ffffff;
         }
 
         .beacon {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             background-color: var(--green);
             border-radius: 50%;
-            box-shadow: 0 0 10px var(--green);
+            box-shadow: 0 0 12px var(--green);
             animation: pulse 1.2s infinite ease-in-out;
             flex-shrink: 0;
         }
 
-        .beacon.degraded { background-color: var(--alert-orange); box-shadow: 0 0 10px var(--alert-orange); }
-        .beacon.error { background-color: var(--alert-red); box-shadow: 0 0 10px var(--alert-red); }
+        .beacon.degraded { background-color: var(--alert-orange); box-shadow: 0 0 12px var(--alert-orange); }
+        .beacon.error { background-color: var(--alert-red); box-shadow: 0 0 12px var(--alert-red); }
 
         @keyframes pulse {
             0% { opacity: 0.2; transform: scale(0.8); }
@@ -138,8 +150,8 @@
 
         .header-stats {
             display: flex;
-            gap: 16px;
-            font-size: 11px;
+            gap: 18px;
+            font-size: calc(11px * var(--tv-scale));
             align-items: center;
         }
 
@@ -149,10 +161,10 @@
             background: rgba(0, 255, 102, 0.1);
             border: 1px solid var(--border-line);
             color: #00ff66;
-            padding: 4px 8px;
+            padding: 6px 10px;
             border-radius: 3px;
             font-family: inherit;
-            font-size: 10px;
+            font-size: calc(10px * var(--tv-scale));
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -172,30 +184,30 @@
         .hud-left {
             grid-column: 1;
             grid-row: 2;
-            padding: 14px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            font-size: 11px;
+            gap: 12px;
+            font-size: calc(11px * var(--tv-scale));
             overflow-y: auto;
         }
 
         .hud-right {
             grid-column: 3;
             grid-row: 2;
-            padding: 14px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
             overflow-y: auto;
         }
 
         .panel-header {
-            font-size: 11px;
+            font-size: calc(11px * var(--tv-scale));
             font-weight: 800;
             color: #fff;
             border-bottom: 1px dashed var(--border-line);
-            padding-bottom: 5px;
+            padding-bottom: 6px;
             letter-spacing: 1px;
             display: flex;
             justify-content: space-between;
@@ -207,30 +219,30 @@
             line-height: 1.4;
         }
 
-        .label { color: rgba(0, 255, 102, 0.65); }
-        .val { color: #ffffff; text-shadow: 0 0 5px rgba(0, 255, 102, 0.4); }
+        .label { color: rgba(0, 255, 102, 0.75); }
+        .val { color: #ffffff; text-shadow: 0 0 6px rgba(0, 255, 102, 0.5); font-weight: 600; }
 
         #alert-box {
             background: rgba(0, 255, 102, 0.05);
             border: 1px solid rgba(0, 255, 102, 0.3);
             border-radius: 3px;
-            padding: 8px;
+            padding: 10px;
             margin-top: 4px;
-            font-size: 11px;
-            line-height: 1.35;
+            font-size: calc(11px * var(--tv-scale));
+            line-height: 1.4;
         }
 
         #alert-box.active-warning {
-            background: rgba(255, 51, 68, 0.18);
+            background: rgba(255, 51, 68, 0.2);
             border-color: var(--alert-red);
-            color: #ff99a8;
+            color: #ffb3bf;
             animation: warningPulse 1s infinite alternate;
         }
 
         #alert-box.active-advisory {
-            background: rgba(255, 170, 0, 0.18);
+            background: rgba(255, 170, 0, 0.2);
             border-color: var(--alert-orange);
-            color: #ffdd99;
+            color: #ffe6b3;
         }
 
         @keyframes warningPulse {
@@ -241,35 +253,36 @@
         .node-card {
             background: rgba(0, 255, 102, 0.04);
             border: 1px solid rgba(0, 255, 102, 0.15);
-            padding: 8px 10px;
+            padding: 10px 12px;
             border-radius: 3px;
-            font-size: 11px;
+            font-size: calc(11px * var(--tv-scale));
             cursor: pointer;
             transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
         }
 
-        .node-card:hover {
-            background: rgba(0, 255, 102, 0.15);
+        .node-card:hover, .node-card.tv-focused {
+            background: rgba(0, 255, 102, 0.2);
             border-color: var(--green);
-            transform: translateX(-2px);
+            transform: translateX(-3px);
+            outline: none;
         }
 
         .node-card.selected {
-            background: rgba(0, 255, 102, 0.25);
+            background: rgba(0, 255, 102, 0.3);
             border-color: var(--green);
-            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+            box-shadow: 0 0 12px rgba(0, 255, 102, 0.5);
         }
 
-        .node-title { font-weight: bold; color: #fff; margin-bottom: 2px; display: flex; justify-content: space-between; }
-        .node-sub { color: rgba(0, 255, 102, 0.85); }
+        .node-title { font-weight: bold; color: #fff; margin-bottom: 3px; display: flex; justify-content: space-between; }
+        .node-sub { color: rgba(0, 255, 102, 0.95); font-weight: 600; }
 
         .dbz-bar {
             display: flex;
-            height: 8px;
+            height: 10px;
             border-radius: 2px;
             overflow: hidden;
-            margin-top: 4px;
-            border: 1px solid rgba(255,255,255,0.2);
+            margin-top: 6px;
+            border: 1px solid rgba(255,255,255,0.3);
         }
         .dbz-step { flex: 1; height: 100%; }
 
@@ -279,8 +292,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 18px;
-            font-size: 11px;
+            padding: 0 20px;
+            font-size: calc(11px * var(--tv-scale));
             color: var(--text-dim);
         }
 
@@ -300,13 +313,13 @@
         <div class="hud-panel hud-header">
             <div class="sys-title">
                 <div id="status-beacon" class="beacon"></div>
-                GAGE COUNTY EOC // HIGH-RES RADAR & SEVERE WEATHER HUD
+                GAGE COUNTY EOC // TV MONITOR TACTICAL HUD
             </div>
             <div class="header-stats">
-                <div class="stat-item">SYNC ROOM: <span id="sync-room-id">GAGE-HUD-1</span> (<span id="sync-status" style="color:#ffaa00;">CONNECTING</span>)</div>
+                <div class="stat-item">SYNC: <span id="sync-status" style="color:#ffaa00;">CONNECTING</span></div>
+                <button id="btn-vis" class="btn-toggle" onclick="toggleHighVis()">EOC HIGH-VIS: OFF</button>
+                <button id="btn-carousel" class="btn-toggle" onclick="toggleCarousel()">AUTO-CYCLE: OFF</button>
                 <button id="btn-audio" class="btn-toggle active" onclick="toggleAudio()">AUDIO: ON</button>
-                <div class="stat-item">HQ: <span>BEATRICE, NE</span></div>
-                <div class="stat-item">GRID: <span>40.2681° N / 96.7470° W</span></div>
                 <div class="stat-item">TIME: <span id="utc-clock">00:00:00 UTC</span></div>
             </div>
         </div>
@@ -323,8 +336,8 @@
             <div class="telemetry-row"><span class="label">RADAR SYNC:</span><span id="radar-sync-time" class="val">PENDING</span></div>
             <div class="telemetry-row"><span class="label">BASE MAP:</span><span class="val">ESRI DARK + ROAD VECTORS</span></div>
 
-            <div style="margin-top: 2px;">
-                <div style="display:flex; justify-content:space-between; font-size:9px; color:rgba(255,255,255,0.6); margin-bottom:2px;">
+            <div style="margin-top: 4px;">
+                <div style="display:flex; justify-content:space-between; font-size:calc(9px * var(--tv-scale)); color:rgba(255,255,255,0.7); margin-bottom:3px;">
                     <span>REFLECTIVITY (dBZ)</span>
                     <span>15 — 75 dBZ</span>
                 </div>
@@ -342,10 +355,10 @@
             </div>
 
             <!-- Display Controls -->
-            <div class="panel-header" style="margin-top: 6px;">
+            <div class="panel-header" style="margin-top: 8px;">
                 <span>HUD LAYER CONTROLS</span>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                 <button id="btn-radar" class="btn-toggle active" onclick="toggleLayer('radar')">RADAR: ON</button>
                 <button id="btn-rings" class="btn-toggle active" onclick="toggleLayer('rings')">RINGS: ON</button>
                 <button id="btn-roads" class="btn-toggle active" onclick="toggleLayer('roads')">ROADS: ON</button>
@@ -353,18 +366,18 @@
             </div>
 
             <!-- Weather Warnings -->
-            <div class="panel-header" style="margin-top: 8px;">
+            <div class="panel-header" style="margin-top: 10px;">
                 <span>NWS LOCAL HAZARD MONITOR</span>
                 <span id="alert-status-badge" style="color:#00ff66;">SYNCING</span>
             </div>
 
             <div id="alert-box">
-                <div id="alert-title" style="font-weight: bold; color: #fff; margin-bottom: 2px;">SCANNING LOCAL ALERTS...</div>
-                <div id="alert-details" style="color: rgba(255,255,255,0.7);">Targeting Gage County sector for active weather hazards.</div>
+                <div id="alert-title" style="font-weight: bold; color: #fff; margin-bottom: 3px;">SCANNING LOCAL ALERTS...</div>
+                <div id="alert-details" style="color: rgba(255,255,255,0.8);">Targeting Gage County sector for active weather hazards.</div>
             </div>
 
             <!-- USGS Hydrology Monitor -->
-            <div class="panel-header" style="margin-top: 8px;">
+            <div class="panel-header" style="margin-top: 10px;">
                 <span>USGS RIVER HYDROLOGY</span>
                 <span id="usgs-status" style="color:#00ff66;">SYNCING</span>
             </div>
@@ -374,7 +387,7 @@
             <div class="telemetry-row"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
 
             <!-- Surface Conditions -->
-            <div class="panel-header" style="margin-top: 8px;">
+            <div class="panel-header" style="margin-top: 10px;">
                 <span>SURFACE CONDITIONS</span>
                 <span id="weather-status" style="color:#00ff66;">CONNECTING</span>
             </div>
@@ -390,16 +403,16 @@
         <div class="hud-panel hud-right">
             <div class="panel-header">
                 <span>SECTOR TARGET NODES</span>
-                <button class="btn-toggle" style="font-size: 9px; padding: 2px 6px;" onclick="resetMapFocus()">RESET HQ</button>
+                <button class="btn-toggle" style="font-size: calc(9px * var(--tv-scale)); padding: 2px 8px;" onclick="resetMapFocus()">RESET HQ</button>
             </div>
-            <div id="node-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+            <div id="node-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
         </div>
 
         <!-- Footer -->
         <div class="hud-panel hud-footer">
             <div id="system-health-label">SYSTEM HEALTH: NOMINAL</div>
             <div>GAGE COUNTY EMERGENCY MANAGEMENT FIELD FEED</div>
-            <div>MODE: REALTIME GEODETIC HUD (MULTI-SCREEN SYNC)</div>
+            <div>MODE: TV MONITOR OPTIMIZED (WAKE-LOCK ACTIVE)</div>
         </div>
 
     </div>
@@ -411,12 +424,34 @@
         // Sector State & Config
         const hqLat = 40.2681;
         const hqLng = -96.7470;
-        let mapCenter = [hqLat, hqLng];
         let hoveredNodeId = null;
         let selectedNodeId = null;
         let lastRadarSyncTime = null;
         let audioEnabled = true;
+        let highVisEnabled = false;
+        let carouselEnabled = false;
+        let carouselIndex = 0;
+        let carouselTimer = null;
+        let tvFocusIndex = -1;
         let networkErrors = { nws: 0, weather: 0, usgs: 0, radarTiles: 0 };
+
+        // Screen Wake Lock API Integration (Prevents smart TV display power-down)
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.warn('Wake Lock error:', err);
+                }
+            }
+        }
+        requestWakeLock();
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
 
         // Layer Visibility Toggles
         const layerConfig = { radar: true, rings: true, roads: true, nodes: true };
@@ -426,8 +461,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room') || 'GAGE-HUD-1';
         const syncTopic = `gage_county_eoc/sync/${roomId}`;
-
-        document.getElementById('sync-room-id').innerText = roomId;
 
         let mqttClient = null;
 
@@ -562,6 +595,44 @@
             if (audioEnabled) playHudSound('click');
         }
 
+        function toggleHighVis() {
+            highVisEnabled = !highVisEnabled;
+            document.body.classList.toggle('high-vis', highVisEnabled);
+            const btn = document.getElementById('btn-vis');
+            if (btn) {
+                btn.innerText = highVisEnabled ? 'EOC HIGH-VIS: ON' : 'EOC HIGH-VIS: OFF';
+                btn.className = highVisEnabled ? 'btn-toggle active' : 'btn-toggle';
+            }
+            playHudSound('click');
+        }
+
+        function toggleCarousel() {
+            carouselEnabled = !carouselEnabled;
+            const btn = document.getElementById('btn-carousel');
+            if (btn) {
+                btn.innerText = carouselEnabled ? 'AUTO-CYCLE: ON' : 'AUTO-CYCLE: OFF';
+                btn.className = carouselEnabled ? 'btn-toggle active' : 'btn-toggle';
+            }
+            playHudSound('click');
+
+            if (carouselEnabled) {
+                carouselIndex = 0;
+                runCarouselStep();
+                carouselTimer = setInterval(runCarouselStep, 12000);
+            } else {
+                if (carouselTimer) clearInterval(carouselTimer);
+            }
+        }
+
+        function runCarouselStep() {
+            if (!carouselEnabled) return;
+            const node = countyNodes[carouselIndex];
+            selectedNodeId = node.id;
+            node.intensity = 1.0;
+            map.flyTo(node.coords, 12, { duration: 1.2 });
+            carouselIndex = (carouselIndex + 1) % countyNodes.length;
+        }
+
         function toggleLayer(layerKey, isRemote = false) {
             playHudSound('click');
             layerConfig[layerKey] = !layerConfig[layerKey];
@@ -572,7 +643,7 @@
                 weatherLayer.setOpacity(layerConfig.radar ? 0.65 : 0.0);
             }
             if (layerKey === 'roads' && roadLayer) {
-                roadLayer.setOpacity(layerConfig.roads ? 0.85 : 0.0);
+                roadLayer.setOpacity(layerConfig.roads ? 0.9 : 0.0);
             }
 
             if (!isRemote) {
@@ -667,20 +738,7 @@
         refreshRadarTileFeed();
         setInterval(refreshRadarTileFeed, 90000);
 
-        // 2. Gage County Boundary Layer
-        fetchWithTimeout('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json', { timeout: 10000 })
-            .then(res => res.json())
-            .then(data => {
-                const gageFeature = data.features ? data.features.find(f => f.id === "31067") : null;
-                if (gageFeature) {
-                    L.geoJSON(gageFeature, {
-                        style: { color: 'rgba(0, 255, 102, 0.35)', weight: 1.2, dashArray: '4, 6', fillOpacity: 0.0 }
-                    }).addTo(map);
-                }
-            })
-            .catch(err => console.warn('Boundary deferred:', err));
-
-        // 3. USGS Big Blue River Hydrology Monitor
+        // 2. USGS Big Blue River Hydrology Monitor
         async function updateUsgsRiverStage() {
             const stageEl = document.getElementById('river-stage');
             const usgsStatusEl = document.getElementById('usgs-status');
@@ -728,7 +786,7 @@
         updateUsgsRiverStage();
         setInterval(updateUsgsRiverStage, 180000);
 
-        // 4. NWS Active Alerts
+        // 3. NWS Active Alerts
         let warningsLayer = null;
         let lastHadSevereWarning = false;
 
@@ -761,10 +819,10 @@
                 warningsLayer = L.geoJSON({ type: 'FeatureCollection', features: gageFeatures }, {
                     style: function(feature) {
                         const eventName = (feature.properties?.event) || '';
-                        if (eventName.includes('Tornado')) return { color: '#ff0033', weight: 3, fillColor: '#ff0033', fillOpacity: 0.35 };
-                        if (eventName.includes('Severe Thunderstorm')) return { color: '#ff7700', weight: 2.5, fillColor: '#ff7700', fillOpacity: 0.30 };
-                        if (eventName.includes('Flood')) return { color: '#00ffcc', weight: 2.5, fillColor: '#00ffcc', fillOpacity: 0.30 };
-                        return { color: '#ffff00', weight: 2, fillColor: '#ffff00', fillOpacity: 0.15 };
+                        if (eventName.includes('Tornado')) return { color: '#ff0033', weight: 3.5, fillColor: '#ff0033', fillOpacity: 0.4 };
+                        if (eventName.includes('Severe Thunderstorm')) return { color: '#ff7700', weight: 3, fillColor: '#ff7700', fillOpacity: 0.35 };
+                        if (eventName.includes('Flood')) return { color: '#00ffcc', weight: 3, fillColor: '#00ffcc', fillOpacity: 0.35 };
+                        return { color: '#ffff00', weight: 2.5, fillColor: '#ffff00', fillOpacity: 0.2 };
                     },
                     onEachFeature: function(feature) {
                         if (feature.properties?.event && !activeHazards.includes(feature.properties.event)) {
@@ -812,7 +870,7 @@
         updateNwsAlerts();
         setInterval(updateNwsAlerts, 60000);
 
-        // 5. Open-Meteo Surface Weather
+        // 4. Open-Meteo Surface Weather
         async function updateWeatherData() {
             try {
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${hqLat}&longitude=${hqLng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,apparent_temperature,pressure_msl&temperature_unit=fahrenheit&wind_speed_unit=mph`;
@@ -836,7 +894,7 @@
         updateWeatherData();
         setInterval(updateWeatherData, 120000);
 
-        // 6. Sector Target Nodes
+        // 5. Sector Target Nodes
         const countyNodes = [
             { id: "NODE-BEA", name: "BEATRICE", coords: [40.2681, -96.7470], intensity: 0 },
             { id: "NODE-WYM", name: "WYMORE", coords: [40.1206, -96.6628], intensity: 0 },
@@ -857,7 +915,6 @@
             return ((Math.atan2(y, x) * (180 / Math.PI)) + 360) % 360;
         }
 
-        // Cache DOM element references for node UI updates to prevent layout thrashing
         const nodeUIElements = {};
 
         function initNodeListUI() {
@@ -865,7 +922,7 @@
             if (!container) return;
             container.innerHTML = '';
             
-            countyNodes.forEach(node => {
+            countyNodes.forEach((node, index) => {
                 const card = document.createElement('div');
                 card.id = `card-${node.id}`;
                 card.className = 'node-card';
@@ -877,7 +934,11 @@
                     <div class="node-sub" id="sub-${node.id}">CALCULATING...</div>
                 `;
 
-                card.addEventListener('mouseenter', () => { hoveredNodeId = node.id; });
+                card.addEventListener('mouseenter', () => { 
+                    hoveredNodeId = node.id; 
+                    tvFocusIndex = index;
+                    updateTvFocusUI();
+                });
                 card.addEventListener('mouseleave', () => { hoveredNodeId = null; });
                 card.addEventListener('click', () => {
                     playHudSound('click');
@@ -889,14 +950,48 @@
 
                 container.appendChild(card);
 
-                // Cache element reference
                 nodeUIElements[node.id] = {
                     card: card,
-                    sub: document.getElementById(`sub-${node.id}`)
+                    sub: document.getElementById(`sub-${node.id}`),
+                    index: index
                 };
             });
         }
         initNodeListUI();
+
+        // TV Remote & Keyboard Directional Focus Handler
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                tvFocusIndex = (tvFocusIndex + 1) % countyNodes.length;
+                updateTvFocusUI();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                tvFocusIndex = (tvFocusIndex - 1 + countyNodes.length) % countyNodes.length;
+                updateTvFocusUI();
+            } else if (e.key === 'Enter' && tvFocusIndex >= 0 && tvFocusIndex < countyNodes.length) {
+                e.preventDefault();
+                const node = countyNodes[tvFocusIndex];
+                playHudSound('click');
+                selectedNodeId = node.id;
+                node.intensity = 1.0;
+                map.flyTo(node.coords, 12, { duration: 1.2 });
+                broadcastAction('SELECT_NODE', { nodeId: node.id });
+            }
+        });
+
+        function updateTvFocusUI() {
+            countyNodes.forEach((node, idx) => {
+                const el = nodeUIElements[node.id];
+                if (!el || !el.card) return;
+                if (idx === tvFocusIndex) {
+                    el.card.classList.add('tv-focused');
+                    hoveredNodeId = node.id;
+                } else {
+                    el.card.classList.remove('tv-focused');
+                }
+            });
+        }
 
         function resetMapFocus(isRemote = false) {
             playHudSound('click');
@@ -927,7 +1022,7 @@
         }
         setInterval(updateNodeListUI, 300);
 
-        // 7. Radar Canvas Sweep Engine
+        // 6. Radar Canvas Sweep Engine
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -973,9 +1068,9 @@
 
             // Range Rings
             if (layerConfig.rings) {
-                ctx.strokeStyle = 'rgba(0, 255, 102, 0.50)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([5, 4]);
+                ctx.strokeStyle = 'rgba(0, 255, 102, 0.6)';
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([6, 5]);
 
                 [5, 10, 15, 20, 25].forEach(miles => {
                     const pt = getSafePoint([hqLat + (miles / 69.0), hqLng]);
@@ -987,14 +1082,14 @@
                     ctx.stroke();
 
                     // Ring Labels
-                    ctx.font = '700 9px "JetBrains Mono", monospace';
-                    ctx.fillStyle = 'rgba(4, 8, 12, 0.85)';
-                    ctx.fillRect(ox - 15, oy - r - 7, 30, 14);
-                    ctx.strokeStyle = 'rgba(0, 255, 102, 0.7)';
-                    ctx.strokeRect(ox - 15, oy - r - 7, 30, 14);
+                    ctx.font = '700 10px "JetBrains Mono", monospace';
+                    ctx.fillStyle = 'rgba(4, 8, 12, 0.9)';
+                    ctx.fillRect(ox - 18, oy - r - 8, 36, 16);
+                    ctx.strokeStyle = 'rgba(0, 255, 102, 0.8)';
+                    ctx.strokeRect(ox - 18, oy - r - 8, 36, 16);
                     ctx.fillStyle = '#ffffff';
                     ctx.textAlign = 'center';
-                    ctx.fillText(`${miles}MI`, ox, oy - r + 3);
+                    ctx.fillText(`${miles}MI`, ox, oy - r + 4);
                 });
                 ctx.setLineDash([]);
                 ctx.textAlign = 'left';
@@ -1005,7 +1100,7 @@
                 const tailSteps = 40;
                 for (let i = 0; i < tailSteps; i++) {
                     const a = sweepAngle - (i * Math.PI / 180);
-                    ctx.fillStyle = `rgba(0, 255, 102, ${(1 - i / tailSteps) * 0.20})`;
+                    ctx.fillStyle = `rgba(0, 255, 102, ${(1 - i / tailSteps) * 0.22})`;
                     ctx.beginPath();
                     ctx.moveTo(ox, oy);
                     ctx.arc(ox, oy, maxRadius, a - (Math.PI / 180), a);
@@ -1013,9 +1108,9 @@
                 }
 
                 ctx.strokeStyle = '#00ff66';
-                ctx.lineWidth = 1.2;
+                ctx.lineWidth = 1.5;
                 ctx.shadowColor = '#00ff66';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 10;
                 ctx.beginPath();
                 ctx.moveTo(ox, oy);
                 ctx.lineTo(ox + maxRadius * Math.cos(sweepAngle), oy + maxRadius * Math.sin(sweepAngle));
@@ -1040,17 +1135,17 @@
                     if (node.intensity > 0.02) {
                         ctx.fillStyle = `rgba(255, 255, 255, ${node.intensity})`;
                         ctx.beginPath();
-                        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                        ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
                         ctx.fill();
 
                         ctx.strokeStyle = `rgba(0, 255, 102, ${node.intensity})`;
                         ctx.beginPath();
-                        ctx.arc(pt.x, pt.y, 14 * (1.2 - node.intensity), 0, Math.PI * 2);
+                        ctx.arc(pt.x, pt.y, 16 * (1.2 - node.intensity), 0, Math.PI * 2);
                         ctx.stroke();
 
                         ctx.fillStyle = `rgba(0, 255, 102, ${node.intensity})`;
-                        ctx.font = '600 11px JetBrains Mono, monospace';
-                        ctx.fillText(node.name, pt.x + 8, pt.y + 3);
+                        ctx.font = '700 12px JetBrains Mono, monospace';
+                        ctx.fillText(node.name, pt.x + 10, pt.y + 4);
 
                         node.intensity *= 0.985;
                     }
@@ -1058,8 +1153,8 @@
                     // Hover & Selected Lock Reticles
                     if (hoveredNodeId === node.id || selectedNodeId === node.id) {
                         ctx.strokeStyle = selectedNodeId === node.id ? '#ffff00' : '#ffffff';
-                        ctx.lineWidth = 1.5;
-                        ctx.strokeRect(pt.x - 10, pt.y - 10, 20, 20);
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(pt.x - 12, pt.y - 12, 24, 24);
                     }
                 });
             }
