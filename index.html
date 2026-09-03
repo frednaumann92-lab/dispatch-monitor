@@ -1,381 +1,1086 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ops Monitor — Slower Stable Feed</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gage County Tactical Weather & Sector Monitor</title>
 
-<style>
-:root{
-  --bg:#000;
-  --accent:#00ffc0;
-}
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Tactical HUD Font -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- MQTT WebSocket Engine -->
+    <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
 
-*{box-sizing:border-box;}
+    <style>
+        :root {
+            --green: #00ff66;
+            --green-dim: rgba(0, 255, 102, 0.25);
+            --bg-dark: #04080c;
+            --panel-bg: rgba(6, 12, 18, 0.92);
+            --border-line: rgba(0, 255, 102, 0.35);
+            --alert-red: #ff3344;
+            --alert-orange: #ffaa00;
+            --alert-yellow: #ffff00;
+            --water-blue: #00ccff;
+            --text-dim: rgba(255, 255, 255, 0.7);
+        }
 
-body{
-  margin:0;
-  font-family:Consolas, monospace;
-  background:var(--bg);
-  color:#fff;
-  height:100vh;
-  overflow:hidden;
-}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-/* LAYOUT */
-#grid{
-  display:flex;
-  height: calc(100vh - 100px);
-}
+        body, html {
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-dark);
+            color: var(--green);
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+            user-select: none;
+        }
 
-#left{
-  width:40%;
-  border-right:2px solid var(--accent);
-  padding:10px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
+        #viewport {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
 
-#right{
-  width:60%;
-  display:flex;
-  flex-direction:column;
-}
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #020508;
+        }
 
-/* CLOCK */
-#clock{
-  text-align:center;
-  border:1px solid #333;
-  padding:10px;
-}
+        .leaflet-tile-container img {
+            image-rendering: pixelated !important;
+            image-rendering: crisp-edges !important;
+        }
 
-#time{font-size:3vw;text-shadow:0 0 10px var(--accent);}
-#date{color:var(--accent);}
-#space{font-size:13px;}
+        .road-tile-layer {
+            filter: brightness(2.5) contrast(1.6) invert(10%) drop-shadow(0px 0px 1px rgba(0,255,102,0.4));
+            opacity: 0.85 !important;
+            z-index: 150 !important;
+        }
 
-#threat{
-  border:1px solid #333;
-  padding:8px;
-  text-align:center;
-}
+        #radarCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 500;
+            pointer-events: none;
+        }
 
-/* RIGHT PANELS */
-#radar{
-  height:45%;
-  width:100%;
-  border:none;
-}
+        .hud-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            pointer-events: none;
+            display: grid;
+            grid-template-rows: 55px 1fr 35px;
+            grid-template-columns: 340px 1fr 340px;
+            padding: 12px;
+            gap: 12px;
+        }
 
-#info{
-  height:30%;
-  border-top:2px solid var(--accent);
-  padding:10px;
-  overflow:auto;
-}
+        .hud-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-line);
+            border-radius: 4px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
+            pointer-events: auto;
+        }
 
-#extra{
-  height:25%;
-  border-top:2px solid #333;
-  padding:10px;
-  overflow:auto;
-  font-size:13px;
-}
+        .hud-header {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 18px;
+        }
 
-/* =========================
-   TICKERS (SLOWED DOWN)
-========================= */
+        .sys-title {
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+        }
 
-.ticker{
-  position:fixed;
-  width:100%;
-  overflow:hidden;
-  z-index:9999;
-  background:#000;
-  white-space:nowrap;
-}
+        .beacon {
+            width: 10px;
+            height: 10px;
+            background-color: var(--green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--green);
+            animation: pulse 1.2s infinite ease-in-out;
+            flex-shrink: 0;
+        }
 
-.ticker-track{
-  display:inline-block;
-  padding-left:100%;
-  animation:scroll 18s linear infinite; /* 🔥 SLOWER GLOBAL SPEED */
-  will-change:transform;
-}
+        .beacon.degraded { background-color: var(--alert-orange); box-shadow: 0 0 10px var(--alert-orange); }
+        .beacon.error { background-color: var(--alert-red); box-shadow: 0 0 10px var(--alert-red); }
 
-.ticker-item{
-  display:inline-block;
-  padding-right:80px;
-}
+        @keyframes pulse {
+            0% { opacity: 0.2; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.3); }
+            100% { opacity: 0.2; transform: scale(0.8); }
+        }
 
-/* JSON TICKER (medium speed feel) */
-#json-bar{
-  bottom:40px;
-  height:60px;
-  border-top:3px solid #00ffff;
-}
+        .header-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 11px;
+            align-items: center;
+        }
 
-#json-track{
-  font-size:26px;
-  color:#fff;
-  text-shadow:0 0 10px #00ffff;
-  line-height:60px;
-}
+        .stat-item span { color: #fff; font-weight: 600; }
 
-/* NASA / WILDFIRE TICKER (SLOWER) */
-#nasa-bar{
-  bottom:0;
-  height:40px;
-  border-top:2px solid var(--accent);
-}
+        .btn-toggle {
+            background: rgba(0, 255, 102, 0.1);
+            border: 1px solid var(--border-line);
+            color: #00ff66;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
 
-#nasa-track{
-  font-size:16px;
-  color:var(--accent);
-  line-height:40px;
-}
+        .btn-toggle:hover {
+            background: rgba(0, 255, 102, 0.25);
+            color: #fff;
+        }
 
-@keyframes scroll{
-  0%{transform:translateX(0);}
-  100%{transform:translateX(-100%);}
-}
+        .btn-toggle.active {
+            background: var(--green);
+            color: #000;
+            border-color: var(--green);
+        }
 
-.card{
-  border:1px solid #333;
-  margin:5px 0;
-  padding:5px;
-}
+        .hud-left {
+            grid-column: 1;
+            grid-row: 2;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 11px;
+            overflow-y: auto;
+        }
 
-</style>
+        .hud-right {
+            grid-column: 3;
+            grid-row: 2;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            font-size: 11px;
+            font-weight: 800;
+            color: #fff;
+            border-bottom: 1px dashed var(--border-line);
+            padding-bottom: 5px;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .telemetry-row {
+            display: flex;
+            justify-content: space-between;
+            line-height: 1.4;
+        }
+
+        .label { color: rgba(0, 255, 102, 0.65); }
+        .val { color: #ffffff; text-shadow: 0 0 5px rgba(0, 255, 102, 0.4); }
+
+        #alert-box {
+            background: rgba(0, 255, 102, 0.05);
+            border: 1px solid rgba(0, 255, 102, 0.3);
+            border-radius: 3px;
+            padding: 8px;
+            margin-top: 4px;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        #alert-box.active-warning {
+            background: rgba(255, 51, 68, 0.18);
+            border-color: var(--alert-red);
+            color: #ff99a8;
+            animation: warningPulse 1s infinite alternate;
+        }
+
+        #alert-box.active-advisory {
+            background: rgba(255, 170, 0, 0.18);
+            border-color: var(--alert-orange);
+            color: #ffdd99;
+        }
+
+        @keyframes warningPulse {
+            from { border-color: rgba(255, 51, 68, 0.4); }
+            to { border-color: rgba(255, 51, 68, 1); }
+        }
+
+        .node-card {
+            background: rgba(0, 255, 102, 0.04);
+            border: 1px solid rgba(0, 255, 102, 0.15);
+            padding: 8px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .node-card:hover {
+            background: rgba(0, 255, 102, 0.15);
+            border-color: var(--green);
+            transform: translateX(-2px);
+        }
+
+        .node-card.selected {
+            background: rgba(0, 255, 102, 0.25);
+            border-color: var(--green);
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+        }
+
+        .node-title { font-weight: bold; color: #fff; margin-bottom: 2px; display: flex; justify-content: space-between; }
+        .node-sub { color: rgba(0, 255, 102, 0.85); }
+
+        .dbz-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .dbz-step { flex: 1; height: 100%; }
+
+        .hud-footer {
+            grid-column: 1 / -1;
+            grid-row: 3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 18px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .leaflet-control-container { display: none !important; }
+    </style>
 </head>
-
 <body>
 
-<div id="grid">
+    <div id="viewport">
+        <div id="map"></div>
+        <canvas id="radarCanvas"></canvas>
+    </div>
 
-<div id="left">
-  <div id="clock">
-    <div id="time">00:00:00</div>
-    <div id="date">Loading...</div>
-    <div id="space">Loading space weather...</div>
-  </div>
+    <div class="hud-overlay">
+        
+        <!-- Header -->
+        <div class="hud-panel hud-header">
+            <div class="sys-title">
+                <div id="status-beacon" class="beacon"></div>
+                GAGE COUNTY EOC // HIGH-RES RADAR & SEVERE WEATHER HUD
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">SYNC ROOM: <span id="sync-room-id">GAGE-HUD-1</span> (<span id="sync-status" style="color:#ffaa00;">CONNECTING</span>)</div>
+                <button id="btn-audio" class="btn-toggle active" onclick="toggleAudio()">AUDIO: ON</button>
+                <div class="stat-item">HQ: <span>BEATRICE, NE</span></div>
+                <div class="stat-item">GRID: <span>40.2681° N / 96.7470° W</span></div>
+                <div class="stat-item">TIME: <span id="utc-clock">00:00:00 UTC</span></div>
+            </div>
+        </div>
 
-  <div id="threat">
-    ⚠️ THREAT INDEX: <span id="threatVal">0</span>/100
-  </div>
+        <!-- Left Panel -->
+        <div class="hud-panel hud-left">
+            <!-- Radar Telemetry -->
+            <div class="panel-header">
+                <span>DOPPLER RADAR FEED</span>
+                <span id="radar-status" style="color:#00ff66;">CONNECTING</span>
+            </div>
+            
+            <div class="telemetry-row"><span class="label">SOURCE:</span><span class="val">NOAA / IEM NEXRAD</span></div>
+            <div class="telemetry-row"><span class="label">RADAR SYNC:</span><span id="radar-sync-time" class="val">PENDING</span></div>
+            <div class="telemetry-row"><span class="label">BASE MAP:</span><span class="val">ESRI DARK + ROAD VECTORS</span></div>
 
-  <div id="alerts">Loading alerts...</div>
-</div>
+            <div style="margin-top: 2px;">
+                <div style="display:flex; justify-content:space-between; font-size:9px; color:rgba(255,255,255,0.6); margin-bottom:2px;">
+                    <span>REFLECTIVITY (dBZ)</span>
+                    <span>15 — 75 dBZ</span>
+                </div>
+                <div class="dbz-bar">
+                    <div class="dbz-step" style="background:#0000ff;"></div>
+                    <div class="dbz-step" style="background:#0099ff;"></div>
+                    <div class="dbz-step" style="background:#00ff00;"></div>
+                    <div class="dbz-step" style="background:#009900;"></div>
+                    <div class="dbz-step" style="background:#ffff00;"></div>
+                    <div class="dbz-step" style="background:#ff9900;"></div>
+                    <div class="dbz-step" style="background:#ff0000;"></div>
+                    <div class="dbz-step" style="background:#cc0000;"></div>
+                    <div class="dbz-step" style="background:#ff00ff;"></div>
+                </div>
+            </div>
 
-<div id="right">
+            <!-- Display Controls -->
+            <div class="panel-header" style="margin-top: 6px;">
+                <span>HUD LAYER CONTROLS</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <button id="btn-radar" class="btn-toggle active" onclick="toggleLayer('radar')">RADAR: ON</button>
+                <button id="btn-rings" class="btn-toggle active" onclick="toggleLayer('rings')">RINGS: ON</button>
+                <button id="btn-roads" class="btn-toggle active" onclick="toggleLayer('roads')">ROADS: ON</button>
+                <button id="btn-nodes" class="btn-toggle active" onclick="toggleLayer('nodes')">NODES: ON</button>
+            </div>
 
-  <iframe id="radar"></iframe>
+            <!-- Weather Warnings -->
+            <div class="panel-header" style="margin-top: 8px;">
+                <span>NWS LOCAL HAZARD MONITOR</span>
+                <span id="alert-status-badge" style="color:#00ff66;">SYNCING</span>
+            </div>
 
-  <div id="info">
-    <div id="weather">Loading weather...</div>
-    <div id="iss">Loading ISS...</div>
-    <div id="quake">Loading seismic...</div>
-  </div>
+            <div id="alert-box">
+                <div id="alert-title" style="font-weight: bold; color: #fff; margin-bottom: 2px;">SCANNING LOCAL ALERTS...</div>
+                <div id="alert-details" style="color: rgba(255,255,255,0.7);">Targeting Gage County sector for active weather hazards.</div>
+            </div>
 
-  <div id="extra">
-    <div id="lightning">Lightning loading...</div>
-    <div id="solar">Solar loading...</div>
-    <div id="neo">Asteroids loading...</div>
-    <div id="net">Network loading...</div>
-  </div>
+            <!-- USGS Hydrology Monitor -->
+            <div class="panel-header" style="margin-top: 8px;">
+                <span>USGS RIVER HYDROLOGY</span>
+                <span id="usgs-status" style="color:#00ff66;">SYNCING</span>
+            </div>
+            <div class="telemetry-row"><span class="label">LOCATION:</span><span class="val">BIG BLUE RIVER AT BEATRICE</span></div>
+            <div class="telemetry-row"><span class="label">GAUGE HEIGHT:</span><span id="river-stage" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">ACTION STAGE:</span><span class="val" style="color:#ffaa00;">14.0 FT</span></div>
+            <div class="telemetry-row"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
 
-</div>
+            <!-- Surface Conditions -->
+            <div class="panel-header" style="margin-top: 8px;">
+                <span>SURFACE CONDITIONS</span>
+                <span id="weather-status" style="color:#00ff66;">CONNECTING</span>
+            </div>
 
-</div>
+            <div class="telemetry-row"><span class="label">TEMPERATURE:</span><span id="weather-temp" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">FEELS LIKE:</span><span id="weather-feels" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">HUMIDITY:</span><span id="weather-humidity" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">WIND VECTOR:</span><span id="weather-wind" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">BARO PRESSURE:</span><span id="weather-baro" class="val">FETCHING...</span></div>
+        </div>
 
-<!-- JSON TICKER -->
-<div id="json-bar" class="ticker">
-  <div class="ticker-track" id="json-track">Connecting OPS feed...</div>
-</div>
+        <!-- Right Sector Nodes Panel -->
+        <div class="hud-panel hud-right">
+            <div class="panel-header">
+                <span>SECTOR TARGET NODES</span>
+                <button class="btn-toggle" style="font-size: 9px; padding: 2px 6px;" onclick="resetMapFocus()">RESET HQ</button>
+            </div>
+            <div id="node-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
 
-<!-- NASA / WILDFIRE TICKER -->
-<div id="nasa-bar" class="ticker">
-  <div class="ticker-track" id="nasa-track">Loading NASA events...</div>
-</div>
+        <!-- Footer -->
+        <div class="hud-panel hud-footer">
+            <div id="system-health-label">SYSTEM HEALTH: NOMINAL</div>
+            <div>GAGE COUNTY EMERGENCY MANAGEMENT FIELD FEED</div>
+            <div>MODE: REALTIME GEODETIC HUD (MULTI-SCREEN SYNC)</div>
+        </div>
 
-<script>
+    </div>
 
-/* CLOCK */
-setInterval(()=>{
-  const d=new Date();
-  document.getElementById("time").textContent=d.toLocaleTimeString();
-  document.getElementById("date").textContent=d.toDateString();
-},1000);
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-/* SPACE */
-let kp=0;
-async function loadSpace(){
-  try{
-    const r=await fetch("https://services.swpc.noaa.gov/json/planetary_k_index_1m.json");
-    const j=await r.json();
-    kp=parseFloat(j[j.length-1]?.kp_index||0);
-    document.getElementById("space").textContent=
-      `🛰️ Kp Index ${kp.toFixed(2)}`;
-  }catch{
-    document.getElementById("space").textContent="Space offline";
-  }
-}
+    <script>
+        // Sector State & Config
+        const hqLat = 40.2681;
+        const hqLng = -96.7470;
+        let mapCenter = [hqLat, hqLng];
+        let hoveredNodeId = null;
+        let selectedNodeId = null;
+        let lastRadarSyncTime = null;
+        let audioEnabled = true;
+        let networkErrors = { nws: 0, weather: 0, usgs: 0, radarTiles: 0 };
 
-/* WEATHER */
-async function loadWeather(){
-  try{
-    const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.2681&longitude=-96.7467&current_weather=true");
-    const d=await r.json();
-    const w=d.current_weather;
-    document.getElementById("weather").textContent=
-      `Weather ${w.temperature}°F Wind ${w.windspeed}`;
-  }catch{}
-}
+        // Layer Visibility Toggles
+        const layerConfig = { radar: true, rings: true, roads: true, nodes: true };
 
-/* ISS */
-async function loadISS(){
-  try{
-    const r=await fetch("https://api.wheretheiss.at/v1/satellites/25544");
-    const d=await r.json();
-    document.getElementById("iss").textContent=
-      `ISS Alt ${Math.round(d.altitude)}km`;
-  }catch{}
-}
+        // --- MULTI-DEVICE WEBSOCKET SYNC ENGINE ---
+        const myClientId = 'HUD_' + Math.random().toString(36).substring(2, 9);
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room') || 'GAGE-HUD-1';
+        const syncTopic = `gage_county_eoc/sync/${roomId}`;
 
-/* QUAKE */
-async function loadQuake(){
-  try{
-    const r=await fetch("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&orderby=time");
-    const d=await r.json();
-    const q=d.features[0];
-    document.getElementById("quake").textContent=
-      `Quake M${q.properties.mag}`;
-  }catch{}
-}
+        document.getElementById('sync-room-id').innerText = roomId;
 
-/* LIGHTNING */
-let lightning=0;
-async function loadLightning(){
-  try{
-    const r=await fetch("https://map.blitzortung.org/map_data.json");
-    const d=await r.json();
-    lightning=d?.flash_data?.length||0;
-    document.getElementById("lightning").textContent=
-      `⚡ Lightning ${lightning}`;
-  }catch{}
-}
+        let mqttClient = null;
 
-/* SOLAR */
-let solar=0;
-async function loadSolar(){
-  try{
-    const r=await fetch("https://services.swpc.noaa.gov/json/goes/primary/xray-flares.json");
-    const d=await r.json();
-    solar=d.length||0;
-    document.getElementById("solar").textContent=
-      `Solar flares ${solar}`;
-  }catch{}
-}
+        function initSyncEngine() {
+            const syncStatusEl = document.getElementById('sync-status');
+            try {
+                mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+                    clientId: myClientId,
+                    keepalive: 30,
+                    reconnectPeriod: 3000,
+                    connectTimeout: 8000
+                });
 
-/* ASTEROIDS */
-let neo=0;
-async function loadNEO(){
-  try{
-    const r=await fetch("https://api.nasa.gov/neo/rest/v1/feed?api_key=DEMO_KEY");
-    const d=await r.json();
-    neo=d.element_count||0;
-    document.getElementById("neo").textContent=
-      `Asteroids ${neo}`;
-  }catch{}
-}
+                mqttClient.on('connect', () => {
+                    if (syncStatusEl) {
+                        syncStatusEl.innerText = 'ONLINE';
+                        syncStatusEl.style.color = '#00ff66';
+                    }
+                    mqttClient.subscribe(syncTopic, (err) => {
+                        if (err) console.warn('Sync subscribe error:', err);
+                    });
+                });
 
-/* NETWORK */
-async function loadNet(){
-  try{
-    const r=await fetch("https://www.cloudflarestatus.com/api/v2/summary.json");
-    const d=await r.json();
-    document.getElementById("net").textContent=
-      `Net ${d.status.description}`;
-  }catch{}
-}
+                mqttClient.on('message', (topic, message) => {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        if (data && data.sender !== myClientId) {
+                            applyRemoteSyncAction(data.action, data.payload);
+                        }
+                    } catch (e) {
+                        console.warn('Sync message parse error:', e);
+                    }
+                });
 
-/* ALERTS */
-async function loadAlerts(){
-  try{
-    const r=await fetch("https://api.weather.gov/alerts/active?area=NE");
-    const d=await r.json();
+                mqttClient.on('error', () => {
+                    if (syncStatusEl) {
+                        syncStatusEl.innerText = 'DEGRADED';
+                        syncStatusEl.style.color = '#ffaa00';
+                    }
+                });
 
-    const html=(d.features||[])
-      .slice(0,6)
-      .map(a=>
-        `<div class="card"><b>${a.properties.event}</b><br>${a.properties.headline||""}</div>`
-      ).join("");
+                mqttClient.on('offline', () => {
+                    if (syncStatusEl) {
+                        syncStatusEl.innerText = 'OFFLINE';
+                        syncStatusEl.style.color = '#ff3344';
+                    }
+                });
+            } catch (err) {
+                console.warn('Sync Engine initialization error:', err);
+                if (syncStatusEl) {
+                    syncStatusEl.innerText = 'ERROR';
+                    syncStatusEl.style.color = '#ff3344';
+                }
+            }
+        }
 
-    document.getElementById("alerts").innerHTML=html||"No alerts";
-  }catch{
-    document.getElementById("alerts").innerHTML="Alerts offline";
-  }
-}
+        function broadcastAction(action, payload = {}) {
+            if (mqttClient && mqttClient.connected) {
+                const message = JSON.stringify({
+                    sender: myClientId,
+                    action: action,
+                    payload: payload,
+                    timestamp: Date.now()
+                });
+                mqttClient.publish(syncTopic, message);
+            }
+        }
 
-/* NASA (wildfires included, just slowed display) */
-async function loadNASA(){
-  try{
-    const r=await fetch("https://eonet.gsfc.nasa.gov/api/v3/events");
-    const d=await r.json();
+        function applyRemoteSyncAction(action, payload) {
+            if (action === 'SELECT_NODE') {
+                const node = countyNodes.find(n => n.id === payload.nodeId);
+                if (node) {
+                    selectedNodeId = node.id;
+                    node.intensity = 1.0;
+                    map.flyTo(node.coords, 12, { duration: 1.2 });
+                    playHudSound('click');
+                }
+            } else if (action === 'RESET_HQ') {
+                resetMapFocus(true);
+            } else if (action === 'TOGGLE_LAYER') {
+                const { layerKey, state } = payload;
+                if (layerConfig[layerKey] !== state) {
+                    toggleLayer(layerKey, true);
+                }
+            }
+        }
 
-    const text=(d.events||[])
-      .slice(0,5)
-      .map(e=>e.title)
-      .join(" ⚫ ");
+        // Web Audio Synthesizer Engine
+        let audioCtx = null;
+        function playHudSound(type) {
+            if (!audioEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    document.getElementById("nasa-track").textContent="NASA "+text;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
 
-  }catch{
-    document.getElementById("nasa-track").textContent="NASA OFFLINE";
-  }
-}
+                const now = audioCtx.currentTime;
 
-/* JSON */
-async function loadJSON(){
-  try{
-    const r=await fetch("ops-feed.json?_="+Date.now());
-    const d=await r.json();
+                if (type === 'click') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'warning') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(880, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                }
+            } catch (e) {
+                console.warn('Audio synth error:', e);
+            }
+        }
 
-    const text="OPS "+(d.messages?.join(" ⚪ ")||"No data");
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('btn-audio');
+            if (btn) {
+                btn.innerText = audioEnabled ? 'AUDIO: ON' : 'AUDIO: MUTED';
+                btn.className = audioEnabled ? 'btn-toggle active' : 'btn-toggle';
+            }
+            if (audioEnabled) playHudSound('click');
+        }
 
-    document.getElementById("json-track").textContent=text;
+        function toggleLayer(layerKey, isRemote = false) {
+            playHudSound('click');
+            layerConfig[layerKey] = !layerConfig[layerKey];
+            const btn = document.getElementById(`btn-${layerKey}`);
+            if (btn) btn.className = layerConfig[layerKey] ? 'btn-toggle active' : 'btn-toggle';
 
-  }catch{
-    document.getElementById("json-track").textContent="OPS OFFLINE";
-  }
-}
+            if (layerKey === 'radar' && weatherLayer) {
+                weatherLayer.setOpacity(layerConfig.radar ? 0.65 : 0.0);
+            }
+            if (layerKey === 'roads' && roadLayer) {
+                roadLayer.setOpacity(layerConfig.roads ? 0.85 : 0.0);
+            }
 
-/* RADAR */
-document.getElementById("radar").src=
-"https://embed.windy.com/embed2.html?lat=39.9&lon=-96.4&zoom=7&overlay=radar";
+            if (!isRemote) {
+                broadcastAction('TOGGLE_LAYER', { layerKey: layerKey, state: layerConfig[layerKey] });
+            }
+        }
 
-/* INIT */
-loadSpace();
-loadWeather();
-loadISS();
-loadQuake();
-loadLightning();
-loadSolar();
-loadNEO();
-loadNet();
-loadAlerts();
-loadNASA();
-loadJSON();
+        // Fetch Helper
+        async function fetchWithTimeout(url, options = {}) {
+            const { timeout = 8000, headers = {} } = options;
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const res = await fetch(url, { ...options, headers, signal: controller.signal });
+                clearTimeout(id);
+                return res;
+            } catch (err) {
+                clearTimeout(id);
+                throw err;
+            }
+        }
 
-/* LOOPS */
-setInterval(loadSpace,60000);
-setInterval(loadLightning,60000);
-setInterval(loadSolar,60000);
-setInterval(loadNEO,60000);
-setInterval(loadAlerts,300000);
-setInterval(loadNASA,300000);
-setInterval(loadJSON,60000);
+        // System Health Monitor
+        function updateSystemHealth() {
+            const beacon = document.getElementById('status-beacon');
+            const healthLabel = document.getElementById('system-health-label');
+            const totalErrors = networkErrors.nws + networkErrors.weather + networkErrors.usgs + networkErrors.radarTiles;
 
-</script>
+            if (!beacon || !healthLabel) return;
 
+            if (totalErrors === 0) {
+                beacon.className = 'beacon';
+                healthLabel.innerText = 'SYSTEM HEALTH: NOMINAL';
+                healthLabel.style.color = 'rgba(255, 255, 255, 0.7)';
+            } else if (totalErrors < 3) {
+                beacon.className = 'beacon degraded';
+                healthLabel.innerText = 'SYSTEM HEALTH: DEGRADED (RETRIEVING)';
+                healthLabel.style.color = '#ffaa00';
+            } else {
+                beacon.className = 'beacon error';
+                healthLabel.innerText = 'SYSTEM HEALTH: NETWORK ALERT';
+                healthLabel.style.color = '#ff3344';
+            }
+        }
+
+        // 1. Leaflet Map Initialization
+        const map = L.map('map', {
+            center: [hqLat, hqLng],
+            zoom: 10,
+            zoomControl: false,
+            dragging: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: false,
+            attributionControl: false
+        });
+
+        // ESRI Base Map
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
+
+        // ESRI Vector Roads Overlay
+        const roadLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16,
+            className: 'road-tile-layer',
+            zIndex: 150
+        }).addTo(map);
+
+        // NEXRAD Doppler Radar Layer
+        const weatherLayer = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', {
+            opacity: 0.65,
+            maxZoom: 16,
+            zIndex: 200
+        }).addTo(map);
+
+        weatherLayer.on('tileload', () => {
+            if (networkErrors.radarTiles > 0) networkErrors.radarTiles--;
+            document.getElementById('radar-status').innerText = 'ONLINE';
+            document.getElementById('radar-status').style.color = '#00ff66';
+            updateSystemHealth();
+        });
+
+        weatherLayer.on('tileerror', () => {
+            networkErrors.radarTiles = Math.min(networkErrors.radarTiles + 1, 5);
+            document.getElementById('radar-status').innerText = networkErrors.radarTiles > 2 ? 'OFFLINE' : 'DEGRADED';
+            document.getElementById('radar-status').style.color = networkErrors.radarTiles > 2 ? '#ff3344' : '#ffaa00';
+            updateSystemHealth();
+        });
+
+        function refreshRadarTileFeed() {
+            weatherLayer.setUrl('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png?t=' + Date.now());
+            lastRadarSyncTime = new Date();
+        }
+        refreshRadarTileFeed();
+        setInterval(refreshRadarTileFeed, 90000);
+
+        // 2. Gage County Boundary Layer
+        fetchWithTimeout('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json', { timeout: 10000 })
+            .then(res => res.json())
+            .then(data => {
+                const gageFeature = data.features ? data.features.find(f => f.id === "31067") : null;
+                if (gageFeature) {
+                    L.geoJSON(gageFeature, {
+                        style: { color: 'rgba(0, 255, 102, 0.35)', weight: 1.2, dashArray: '4, 6', fillOpacity: 0.0 }
+                    }).addTo(map);
+                }
+            })
+            .catch(err => console.warn('Boundary deferred:', err));
+
+        // 3. USGS Big Blue River Hydrology Monitor
+        async function updateUsgsRiverStage() {
+            const stageEl = document.getElementById('river-stage');
+            const usgsStatusEl = document.getElementById('usgs-status');
+
+            try {
+                const url = 'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=06884000&parameterCd=00065';
+                const res = await fetchWithTimeout(url, { timeout: 7000 });
+                if (!res.ok) throw new Error(`USGS HTTP ${res.status}`);
+                
+                const data = await res.json();
+                const timeSeries = data.value?.timeSeries[0];
+                const latestValue = timeSeries?.values[0]?.value[0]?.value;
+
+                if (latestValue !== undefined) {
+                    const feet = parseFloat(latestValue).toFixed(2);
+                    stageEl.innerText = `${feet} FT`;
+
+                    if (feet >= 18.0) {
+                        stageEl.style.color = '#ff3344';
+                        stageEl.innerText += ' [MAJOR FLOOD]';
+                    } else if (feet >= 14.0) {
+                        stageEl.style.color = '#ffaa00';
+                        stageEl.innerText += ' [ACTION STAGE]';
+                    } else {
+                        stageEl.style.color = '#00ccff';
+                    }
+
+                    usgsStatusEl.innerText = 'ONLINE';
+                    usgsStatusEl.style.color = '#00ff66';
+                    networkErrors.usgs = 0;
+                }
+            } catch (err) {
+                console.warn('USGS Hydrology Error:', err);
+                networkErrors.usgs = Math.min(networkErrors.usgs + 1, 5);
+                if (networkErrors.usgs > 2) {
+                    stageEl.innerText = 'OFFLINE';
+                    stageEl.style.color = '#ffaa00';
+                    usgsStatusEl.innerText = 'DEGRADED';
+                    usgsStatusEl.style.color = '#ffaa00';
+                }
+            } finally {
+                updateSystemHealth();
+            }
+        }
+        updateUsgsRiverStage();
+        setInterval(updateUsgsRiverStage, 180000);
+
+        // 4. NWS Active Alerts
+        let warningsLayer = null;
+        let lastHadSevereWarning = false;
+
+        async function updateNwsAlerts() {
+            const alertBox = document.getElementById('alert-box');
+            const alertTitle = document.getElementById('alert-title');
+            const alertDetails = document.getElementById('alert-details');
+            const alertBadge = document.getElementById('alert-status-badge');
+
+            try {
+                const res = await fetchWithTimeout('https://api.weather.gov/alerts/active?area=NE', {
+                    headers: { 'User-Agent': '(GageCountyEOCMonitor, contact@gagecounty.org)' },
+                    timeout: 8000
+                });
+
+                if (!res.ok) throw new Error(`NWS API HTTP ${res.status}`);
+                const data = await res.json();
+
+                if (warningsLayer) map.removeLayer(warningsLayer);
+
+                const gageFeatures = (data.features || []).filter(feature => {
+                    const props = feature.properties || {};
+                    const area = (props.areaDesc || '').toLowerCase();
+                    const ugc = (props.geocode && props.geocode.UGC) ? props.geocode.UGC : [];
+                    return area.includes('gage') || ugc.includes('NEZ089') || ugc.includes('NEC067');
+                });
+
+                let activeHazards = [];
+
+                warningsLayer = L.geoJSON({ type: 'FeatureCollection', features: gageFeatures }, {
+                    style: function(feature) {
+                        const eventName = (feature.properties?.event) || '';
+                        if (eventName.includes('Tornado')) return { color: '#ff0033', weight: 3, fillColor: '#ff0033', fillOpacity: 0.35 };
+                        if (eventName.includes('Severe Thunderstorm')) return { color: '#ff7700', weight: 2.5, fillColor: '#ff7700', fillOpacity: 0.30 };
+                        if (eventName.includes('Flood')) return { color: '#00ffcc', weight: 2.5, fillColor: '#00ffcc', fillOpacity: 0.30 };
+                        return { color: '#ffff00', weight: 2, fillColor: '#ffff00', fillOpacity: 0.15 };
+                    },
+                    onEachFeature: function(feature) {
+                        if (feature.properties?.event && !activeHazards.includes(feature.properties.event)) {
+                            activeHazards.push(feature.properties.event);
+                        }
+                    }
+                }).addTo(map);
+
+                if (activeHazards.length > 0) {
+                    const primary = activeHazards[0];
+                    const hasWarning = activeHazards.some(h => h.includes('Warning'));
+                    
+                    if (hasWarning && !lastHadSevereWarning) {
+                        playHudSound('warning');
+                        lastHadSevereWarning = true;
+                    }
+
+                    if (alertBox) alertBox.className = hasWarning ? 'active-warning' : 'active-advisory';
+                    if (alertBadge) {
+                        alertBadge.innerText = hasWarning ? 'WARNING ACTIVE' : 'ADVISORY ACTIVE';
+                        alertBadge.style.color = hasWarning ? '#ff3344' : '#ffaa00';
+                    }
+                    if (alertTitle) alertTitle.innerText = activeHazards.length > 1 ? `${activeHazards.length} ACTIVE HAZARDS` : primary.toUpperCase();
+                    if (alertDetails) alertDetails.innerText = activeHazards.join(' | ');
+                } else {
+                    lastHadSevereWarning = false;
+                    if (alertBox) alertBox.className = '';
+                    if (alertBadge) {
+                        alertBadge.innerText = 'CLEAR';
+                        alertBadge.style.color = '#00ff66';
+                    }
+                    if (alertTitle) alertTitle.innerText = 'NO ACTIVE ALERTS';
+                    if (alertDetails) alertDetails.innerText = 'No severe warnings, watches, or advisories active in Beatrice / Gage County sector.';
+                }
+
+                networkErrors.nws = 0;
+
+            } catch (err) {
+                console.warn('NWS Alerts Warning:', err.message || err);
+                networkErrors.nws = Math.min(networkErrors.nws + 1, 5);
+            } finally {
+                updateSystemHealth();
+            }
+        }
+        updateNwsAlerts();
+        setInterval(updateNwsAlerts, 60000);
+
+        // 5. Open-Meteo Surface Weather
+        async function updateWeatherData() {
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${hqLat}&longitude=${hqLng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,apparent_temperature,pressure_msl&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+                const res = await fetchWithTimeout(url, { timeout: 8000 });
+                const data = await res.json();
+                const cur = data.current;
+
+                document.getElementById('weather-temp').innerText = `${Math.round(cur.temperature_2m)}°F`;
+                document.getElementById('weather-feels').innerText = `${Math.round(cur.apparent_temperature)}°F`;
+                document.getElementById('weather-humidity').innerText = `${Math.round(cur.relative_humidity_2m)}%`;
+                document.getElementById('weather-wind').innerText = `${Math.round(cur.wind_speed_10m)} MPH`;
+                document.getElementById('weather-baro').innerText = `${(cur.pressure_msl * 0.02953).toFixed(2)} inHg`;
+                document.getElementById('weather-status').innerText = 'SYNCED';
+                networkErrors.weather = 0;
+            } catch (e) {
+                networkErrors.weather = Math.min(networkErrors.weather + 1, 5);
+            } finally {
+                updateSystemHealth();
+            }
+        }
+        updateWeatherData();
+        setInterval(updateWeatherData, 120000);
+
+        // 6. Sector Target Nodes
+        const countyNodes = [
+            { id: "NODE-BEA", name: "BEATRICE", coords: [40.2681, -96.7470], intensity: 0 },
+            { id: "NODE-WYM", name: "WYMORE", coords: [40.1206, -96.6628], intensity: 0 },
+            { id: "NODE-CRT", name: "CORTLAND", coords: [40.5053, -96.7036], intensity: 0 },
+            { id: "NODE-ADM", name: "ADAMS", coords: [40.4572, -96.5094], intensity: 0 },
+            { id: "NODE-FIL", name: "FILLEY", coords: [40.2858, -96.5333], intensity: 0 },
+            { id: "NODE-CLA", name: "CLATONIA", coords: [40.4633, -96.8525], intensity: 0 },
+            { id: "NODE-ODE", name: "ODELL", coords: [40.0519, -96.8008], intensity: 0 },
+            { id: "NODE-BAR", name: "BARNSTON", coords: [40.0483, -96.5742], intensity: 0 },
+            { id: "NODE-AIR", name: "GAGE CTY ARPT", coords: [40.3014, -96.7539], intensity: 0 }
+        ];
+
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const rad = Math.PI / 180;
+            const dLon = (lon2 - lon1) * rad;
+            const y = Math.sin(dLon) * Math.cos(lat2 * rad);
+            const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
+            return ((Math.atan2(y, x) * (180 / Math.PI)) + 360) % 360;
+        }
+
+        function initNodeListUI() {
+            const container = document.getElementById('node-list');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            countyNodes.forEach(node => {
+                const card = document.createElement('div');
+                card.id = `card-${node.id}`;
+                card.className = 'node-card';
+                card.innerHTML = `
+                    <div class="node-title">
+                        <span>${node.name}</span>
+                        <span>${node.id}</span>
+                    </div>
+                    <div class="node-sub" id="sub-${node.id}">CALCULATING...</div>
+                `;
+
+                card.addEventListener('mouseenter', () => { hoveredNodeId = node.id; });
+                card.addEventListener('mouseleave', () => { hoveredNodeId = null; });
+                card.addEventListener('click', () => {
+                    playHudSound('click');
+                    selectedNodeId = node.id;
+                    node.intensity = 1.0;
+                    map.flyTo(node.coords, 12, { duration: 1.2 });
+                    broadcastAction('SELECT_NODE', { nodeId: node.id });
+                });
+
+                container.appendChild(card);
+            });
+        }
+        initNodeListUI();
+
+        function resetMapFocus(isRemote = false) {
+            playHudSound('click');
+            selectedNodeId = null;
+            map.flyTo([hqLat, hqLng], 10, { duration: 1.2 });
+            if (!isRemote) {
+                broadcastAction('RESET_HQ');
+            }
+        }
+
+        function updateNodeListUI() {
+            const centerLatLng = L.latLng(map.getCenter());
+            countyNodes.forEach(node => {
+                const card = document.getElementById(`card-${node.id}`);
+                const sub = document.getElementById(`sub-${node.id}`);
+                if (!card || !sub) return;
+
+                if (selectedNodeId === node.id) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+
+                const nodeLatLng = L.latLng(node.coords[0], node.coords[1]);
+                const distMiles = (centerLatLng.distanceTo(nodeLatLng) / 1609.344).toFixed(1);
+                const brg = calculateBearing(centerLatLng.lat, centerLatLng.lng, node.coords[0], node.coords[1]);
+
+                sub.innerText = `BEARING: ${Math.round(brg).toString().padStart(3, '0')}° | RANGE: ${distMiles} MI`;
+            });
+        }
+        setInterval(updateNodeListUI, 300);
+
+        // 7. Radar Canvas Sweep Engine
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function syncCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            map.invalidateSize();
+        }
+        window.addEventListener('resize', syncCanvas);
+        syncCanvas();
+
+        function getSafePoint(coords) {
+            try {
+                const pt = map.latLngToContainerPoint(coords);
+                return { x: pt.x, y: pt.y, valid: !isNaN(pt.x) && !isNaN(pt.y) };
+            } catch (e) {
+                return { x: 0, y: 0, valid: false };
+            }
+        }
+
+        let sweepAngle = 0;
+        let lastTime = performance.now();
+
+        function renderRadar(now) {
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            ctx.clearRect(0, 0, w, h);
+
+            const origin = getSafePoint([hqLat, hqLng]);
+            if (!origin.valid) {
+                requestAnimationFrame(renderRadar);
+                return;
+            }
+
+            const ox = origin.x;
+            const oy = origin.y;
+            const maxRadius = Math.max(w, h) * 1.2;
+
+            // Range Rings
+            if (layerConfig.rings) {
+                ctx.strokeStyle = 'rgba(0, 255, 102, 0.50)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 4]);
+
+                [5, 10, 15, 20, 25].forEach(miles => {
+                    const pt = getSafePoint([hqLat + (miles / 69.0), hqLng]);
+                    if (!pt.valid) return;
+                    const r = Math.abs(oy - pt.y);
+
+                    ctx.beginPath();
+                    ctx.arc(ox, oy, r, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Ring Labels
+                    ctx.font = '700 9px "JetBrains Mono", monospace';
+                    ctx.fillStyle = 'rgba(4, 8, 12, 0.85)';
+                    ctx.fillRect(ox - 15, oy - r - 7, 30, 14);
+                    ctx.strokeStyle = 'rgba(0, 255, 102, 0.7)';
+                    ctx.strokeRect(ox - 15, oy - r - 7, 30, 14);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${miles}MI`, ox, oy - r + 3);
+                });
+                ctx.setLineDash([]);
+                ctx.textAlign = 'left';
+            }
+
+            // Radar Sweep Beam
+            if (layerConfig.radar) {
+                const tailSteps = 40;
+                for (let i = 0; i < tailSteps; i++) {
+                    const a = sweepAngle - (i * Math.PI / 180);
+                    ctx.fillStyle = `rgba(0, 255, 102, ${(1 - i / tailSteps) * 0.20})`;
+                    ctx.beginPath();
+                    ctx.moveTo(ox, oy);
+                    ctx.arc(ox, oy, maxRadius, a - (Math.PI / 180), a);
+                    ctx.fill();
+                }
+
+                ctx.strokeStyle = '#00ff66';
+                ctx.lineWidth = 1.2;
+                ctx.shadowColor = '#00ff66';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(ox, oy);
+                ctx.lineTo(ox + maxRadius * Math.cos(sweepAngle), oy + maxRadius * Math.sin(sweepAngle));
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Sector Town Blips
+            if (layerConfig.nodes) {
+                countyNodes.forEach(node => {
+                    const pt = getSafePoint(node.coords);
+                    if (!pt.valid) return;
+
+                    let nodeAngle = Math.atan2(pt.y - oy, pt.x - ox);
+                    if (nodeAngle < 0) nodeAngle += Math.PI * 2;
+
+                    let diff = sweepAngle - nodeAngle;
+                    if (diff < 0) diff += Math.PI * 2;
+
+                    if (diff < 0.04) node.intensity = 1.0;
+
+                    if (node.intensity > 0.02) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${node.intensity})`;
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.strokeStyle = `rgba(0, 255, 102, ${node.intensity})`;
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 14 * (1.2 - node.intensity), 0, Math.PI * 2);
+                        ctx.stroke();
+
+                        ctx.fillStyle = `rgba(0, 255, 102, ${node.intensity})`;
+                        ctx.font = '600 11px JetBrains Mono, monospace';
+                        ctx.fillText(node.name, pt.x + 8, pt.y + 3);
+
+                        node.intensity *= 0.985;
+                    }
+
+                    // Hover & Selected Lock Reticles
+                    if (hoveredNodeId === node.id || selectedNodeId === node.id) {
+                        ctx.strokeStyle = selectedNodeId === node.id ? '#ffff00' : '#ffffff';
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(pt.x - 10, pt.y - 10, 20, 20);
+                    }
+                });
+            }
+
+            sweepAngle += 0.5 * dt;
+            if (sweepAngle >= Math.PI * 2) sweepAngle = 0;
+
+            requestAnimationFrame(renderRadar);
+        }
+
+        // Clock Update Loop
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('utc-clock').innerText = now.toISOString().replace('T', ' ').substring(11, 19) + " UTC";
+
+            const syncEl = document.getElementById('radar-sync-time');
+            if (syncEl) {
+                if (!lastRadarSyncTime) syncEl.innerText = "PENDING";
+                else {
+                    const sec = Math.floor((now - lastRadarSyncTime) / 1000);
+                    syncEl.innerText = sec < 10 ? "JUST NOW" : `${sec}s AGO`;
+                }
+            }
+        }, 1000);
+
+        // Start engines
+        initSyncEngine();
+        requestAnimationFrame(renderRadar);
+    </script>
 </body>
 </html>
