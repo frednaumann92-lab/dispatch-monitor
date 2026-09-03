@@ -3,434 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gage County Tactical Weather & Sector Monitor</title>
-
+    <title>Gage County EOC - Tactical Operations HUD</title>
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Tactical HUD Font -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
-    <!-- MQTT WebSocket Engine -->
-    <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
-
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- MQTT.js for Multi-Device Sync -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <style>
-        :root {
-            --green: #00ff66;
-            --green-dim: rgba(0, 255, 102, 0.25);
-            --bg-dark: #04080c;
-            --panel-bg: rgba(6, 12, 18, 0.92);
-            --border-line: rgba(0, 255, 102, 0.35);
-            --alert-red: #ff3344;
-            --alert-orange: #ffaa00;
-            --alert-yellow: #ffff00;
-            --water-blue: #00ccff;
-            --text-dim: rgba(255, 255, 255, 0.7);
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #04080c; font-family: 'JetBrains Mono', monospace; color: #00ff66; }
+        
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; background: #04080c; }
+        #radarCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        /* HUD Overlay Layout */
+        .hud-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: grid; grid-template-columns: 320px 1fr 340px; grid-template-rows: 60px 1fr 50px; padding: 12px; gap: 12px; transition: grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        .hud-container.left-collapsed { grid-template-columns: 0px 1fr 340px; }
+        .hud-container.right-collapsed { grid-template-columns: 320px 1fr 0px; }
+        .hud-container.both-collapsed { grid-template-columns: 0px 1fr 0px; }
 
-        body, html {
-            width: 100vw;
-            height: 100vh;
-            background-color: var(--bg-dark);
-            color: var(--green);
-            font-family: 'JetBrains Mono', monospace;
-            overflow: hidden;
-            user-select: none;
-        }
+        .hud-panel { background: rgba(4, 8, 12, 0.85); border: 1px solid rgba(0, 255, 102, 0.35); box-shadow: 0 0 15px rgba(0, 255, 102, 0.1); padding: 12px; pointer-events: auto; backdrop-filter: blur(4px); display: flex; flex-direction: column; gap: 8px; overflow: hidden; transition: opacity 0.25s ease, padding 0.35s ease, border-width 0.35s ease; }
+        
+        header.hud-panel { grid-column: 1 / 4; grid-row: 1; flex-direction: row; justify-content: space-between; align-items: center; overflow: visible; }
+        
+        .sidebar-left { grid-column: 1; grid-row: 2; overflow-y: auto; }
+        .hud-container.left-collapsed .sidebar-left { opacity: 0; pointer-events: none; padding: 0; border-width: 0; }
 
-        #viewport {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-        }
+        .sidebar-right { grid-column: 3; grid-row: 2; overflow-y: auto; }
+        .hud-container.right-collapsed .sidebar-right { opacity: 0; pointer-events: none; padding: 0; border-width: 0; }
 
-        #map {
-            width: 100%;
-            height: 100%;
-            background: #020508;
-        }
+        footer.hud-panel { grid-column: 1 / 4; grid-row: 3; flex-direction: row; justify-content: space-between; align-items: center; font-size: 11px; overflow: visible; }
 
-        .leaflet-tile-container img {
-            image-rendering: pixelated !important;
-            image-rendering: crisp-edges !important;
-        }
+        h1, h2, h3 { font-size: 13px; letter-spacing: 1px; color: #ffffff; border-bottom: 1px solid rgba(0, 255, 102, 0.2); padding-bottom: 4px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; white-space: nowrap; }
+        
+        .metric-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed rgba(255, 255, 102, 0.1); white-space: nowrap; }
+        .metric-label { color: rgba(255, 255, 102, 0.7); }
+        .metric-value { font-weight: 700; color: #00ff66; }
 
-        .road-tile-layer {
-            filter: brightness(2.5) contrast(1.6) invert(10%) drop-shadow(0px 0px 1px rgba(0,255,102,0.4));
-            opacity: 0.85 !important;
-            z-index: 150 !important;
-        }
+        /* Buttons & Controls */
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+        .btn-toggle { background: rgba(0, 255, 102, 0.05); border: 1px solid rgba(0, 255, 102, 0.4); color: #00ff66; padding: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; cursor: pointer; text-align: center; transition: all 0.2s; white-space: nowrap; }
+        .btn-toggle:hover { background: rgba(0, 255, 102, 0.2); }
+        .btn-toggle.active { background: rgba(0, 255, 102, 0.35); color: #ffffff; border-color: #00ff66; box-shadow: 0 0 8px rgba(0, 255, 102, 0.4); }
 
-        #radarCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 500;
-            pointer-events: none;
-        }
+        .collapse-btn { background: transparent; border: 1px solid rgba(0, 255, 102, 0.3); color: #00ff66; font-size: 10px; padding: 2px 6px; cursor: pointer; font-family: 'JetBrains Mono', monospace; }
+        .collapse-btn:hover { background: rgba(0, 255, 102, 0.2); color: #fff; }
 
-        .hud-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1000;
-            pointer-events: none;
-            display: grid;
-            grid-template-rows: 55px 1fr 35px;
-            grid-template-columns: 340px 1fr 340px;
-            padding: 12px;
-            gap: 12px;
-        }
+        /* Node List Cards */
+        .node-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+        .node-card { background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 255, 102, 0.2); padding: 8px; cursor: pointer; transition: all 0.2s; }
+        .node-card:hover { border-color: #00ff66; background: rgba(0, 255, 102, 0.08); }
+        .node-card.selected { border-color: #ffff00; background: rgba(255, 255, 0, 0.1); }
+        .node-title { display: flex; justify-content: space-between; font-weight: 700; font-size: 12px; color: #ffffff; }
+        .node-sub { font-size: 10px; color: rgba(0, 255, 102, 0.6); margin-top: 2px; }
 
-        .hud-panel {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-line);
-            border-radius: 4px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
-            pointer-events: auto;
-        }
+        /* Alert Banners */
+        #alert-box { background: rgba(0, 255, 102, 0.05); border-left: 4px solid #00ff66; padding: 8px; font-size: 11px; }
+        #alert-box.active-warning { background: rgba(255, 51, 68, 0.15); border-left-color: #ff3344; }
+        #alert-box.active-watch { background: rgba(255, 170, 0, 0.15); border-left-color: #ffaa00; }
+        #alert-box.active-heat { background: rgba(255, 102, 0, 0.15); border-left-color: #ff6600; }
+        #alert-box.active-advisory { background: rgba(255, 255, 0, 0.15); border-left-color: #ffff00; }
 
-        .hud-header {
-            grid-column: 1 / -1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 18px;
-        }
+        .beacon { width: 10px; height: 10px; border-radius: 50%; background: #00ff66; display: inline-block; box-shadow: 0 0 8px #00ff66; animation: pulse 2s infinite; }
+        .beacon.degraded { background: #ffaa00; box-shadow: 0 0 8px #ffaa00; }
+        .beacon.error { background: #ff3344; box-shadow: 0 0 8px #ff3344; }
 
-        .sys-title {
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 2px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #ffffff;
-        }
-
-        .beacon {
-            width: 10px;
-            height: 10px;
-            background-color: var(--green);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--green);
-            animation: pulse 1.2s infinite ease-in-out;
-            flex-shrink: 0;
-        }
-
-        .beacon.degraded { background-color: var(--alert-orange); box-shadow: 0 0 10px var(--alert-orange); }
-        .beacon.error { background-color: var(--alert-red); box-shadow: 0 0 10px var(--alert-red); }
-
-        @keyframes pulse {
-            0% { opacity: 0.2; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.3); }
-            100% { opacity: 0.2; transform: scale(0.8); }
-        }
-
-        .header-stats {
-            display: flex;
-            gap: 16px;
-            font-size: 11px;
-            align-items: center;
-        }
-
-        .stat-item span { color: #fff; font-weight: 600; }
-
-        .btn-toggle {
-            background: rgba(0, 255, 102, 0.1);
-            border: 1px solid var(--border-line);
-            color: #00ff66;
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-family: inherit;
-            font-size: 10px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-toggle:hover {
-            background: rgba(0, 255, 102, 0.25);
-            color: #fff;
-        }
-
-        .btn-toggle.active {
-            background: var(--green);
-            color: #000;
-            border-color: var(--green);
-        }
-
-        .hud-left {
-            grid-column: 1;
-            grid-row: 2;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            font-size: 11px;
-            overflow-y: auto;
-        }
-
-        .hud-right {
-            grid-column: 3;
-            grid-row: 2;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            overflow-y: auto;
-        }
-
-        .panel-header {
-            font-size: 11px;
-            font-weight: 800;
-            color: #fff;
-            border-bottom: 1px dashed var(--border-line);
-            padding-bottom: 5px;
-            letter-spacing: 1px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .telemetry-row {
-            display: flex;
-            justify-content: space-between;
-            line-height: 1.4;
-        }
-
-        .label { color: rgba(0, 255, 102, 0.65); }
-        .val { color: #ffffff; text-shadow: 0 0 5px rgba(0, 255, 102, 0.4); }
-
-        #alert-box {
-            background: rgba(0, 255, 102, 0.05);
-            border: 1px solid rgba(0, 255, 102, 0.3);
-            border-radius: 3px;
-            padding: 8px;
-            margin-top: 4px;
-            font-size: 11px;
-            line-height: 1.35;
-        }
-
-        #alert-box.active-warning {
-            background: rgba(255, 51, 68, 0.18);
-            border-color: var(--alert-red);
-            color: #ff99a8;
-            animation: warningPulse 1s infinite alternate;
-        }
-
-        #alert-box.active-advisory {
-            background: rgba(255, 170, 0, 0.18);
-            border-color: var(--alert-orange);
-            color: #ffdd99;
-        }
-
-        @keyframes warningPulse {
-            from { border-color: rgba(255, 51, 68, 0.4); }
-            to { border-color: rgba(255, 51, 68, 1); }
-        }
-
-        .node-card {
-            background: rgba(0, 255, 102, 0.04);
-            border: 1px solid rgba(0, 255, 102, 0.15);
-            padding: 8px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-        }
-
-        .node-card:hover {
-            background: rgba(0, 255, 102, 0.15);
-            border-color: var(--green);
-            transform: translateX(-2px);
-        }
-
-        .node-card.selected {
-            background: rgba(0, 255, 102, 0.25);
-            border-color: var(--green);
-            box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
-        }
-
-        .node-title { font-weight: bold; color: #fff; margin-bottom: 2px; display: flex; justify-content: space-between; }
-        .node-sub { color: rgba(0, 255, 102, 0.85); }
-
-        .dbz-bar {
-            display: flex;
-            height: 8px;
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 4px;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        .dbz-step { flex: 1; height: 100%; }
-
-        .hud-footer {
-            grid-column: 1 / -1;
-            grid-row: 3;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 18px;
-            font-size: 11px;
-            color: var(--text-dim);
-        }
-
-        .leaflet-control-container { display: none !important; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,255,102,0.4); }
     </style>
 </head>
 <body>
 
-    <div id="viewport">
-        <div id="map"></div>
-        <canvas id="radarCanvas"></canvas>
-    </div>
+    <div id="map"></div>
+    <canvas id="radarCanvas"></canvas>
 
-    <div class="hud-overlay">
-        
+    <div id="hud-container" class="hud-container">
         <!-- Header -->
-        <div class="hud-panel hud-header">
-            <div class="sys-title">
+        <header class="hud-panel">
+            <div style="display: flex; align-items: center; gap: 10px;">
                 <div id="status-beacon" class="beacon"></div>
-                GAGE COUNTY EOC // HIGH-RES RADAR & SEVERE WEATHER HUD
-            </div>
-            <div class="header-stats">
-                <div class="stat-item">SYNC ROOM: <span id="sync-room-id">GAGE-HUD-1</span> (<span id="sync-status" style="color:#ffaa00;">CONNECTING</span>)</div>
-                <button id="btn-audio" class="btn-toggle active" onclick="toggleAudio()">AUDIO: ON</button>
-                <div class="stat-item">HQ: <span>BEATRICE, NE</span></div>
-                <div class="stat-item">GRID: <span>40.2681° N / 96.7470° W</span></div>
-                <div class="stat-item">TIME: <span id="utc-clock">00:00:00 UTC</span></div>
-            </div>
-        </div>
-
-        <!-- Left Panel -->
-        <div class="hud-panel hud-left">
-            <!-- Radar Telemetry -->
-            <div class="panel-header">
-                <span>DOPPLER RADAR FEED</span>
-                <span id="radar-status" style="color:#00ff66;">CONNECTING</span>
-            </div>
-            
-            <div class="telemetry-row"><span class="label">SOURCE:</span><span class="val">NOAA / IEM NEXRAD</span></div>
-            <div class="telemetry-row"><span class="label">RADAR SYNC:</span><span id="radar-sync-time" class="val">PENDING</span></div>
-            <div class="telemetry-row"><span class="label">BASE MAP:</span><span class="val">ESRI DARK + ROAD VECTORS</span></div>
-
-            <div style="margin-top: 2px;">
-                <div style="display:flex; justify-content:space-between; font-size:9px; color:rgba(255,255,255,0.6); margin-bottom:2px;">
-                    <span>REFLECTIVITY (dBZ)</span>
-                    <span>15 — 75 dBZ</span>
-                </div>
-                <div class="dbz-bar">
-                    <div class="dbz-step" style="background:#0000ff;"></div>
-                    <div class="dbz-step" style="background:#0099ff;"></div>
-                    <div class="dbz-step" style="background:#00ff00;"></div>
-                    <div class="dbz-step" style="background:#009900;"></div>
-                    <div class="dbz-step" style="background:#ffff00;"></div>
-                    <div class="dbz-step" style="background:#ff9900;"></div>
-                    <div class="dbz-step" style="background:#ff0000;"></div>
-                    <div class="dbz-step" style="background:#cc0000;"></div>
-                    <div class="dbz-step" style="background:#ff00ff;"></div>
+                <div>
+                    <h1 style="border:none; margin:0; font-size:14px;">GAGE COUNTY EOC // TACTICAL HUD</h1>
+                    <div style="font-size: 10px; color: rgba(255,255,255,0.6);">SECTOR: BEATRICE / WYMORE // ROOM: <span id="sync-room-id">GAGE-HUD-1</span></div>
                 </div>
             </div>
-
-            <!-- Display Controls -->
-            <div class="panel-header" style="margin-top: 6px;">
-                <span>HUD LAYER CONTROLS</span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-toggle" style="padding: 4px 8px; font-size: 10px;" onclick="togglePanel('left')">TOGGLE LEFT</button>
+                <div id="utc-clock" style="font-size: 15px; font-weight: 700; color: #ffffff; padding: 0 10px;">00:00:00 UTC</div>
+                <button class="btn-toggle" style="padding: 4px 8px; font-size: 10px;" onclick="togglePanel('right')">TOGGLE RIGHT</button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        </header>
+
+        <!-- Left Sidebar: Controls & Sector Nodes -->
+        <div id="sidebar-left" class="hud-panel sidebar-left">
+            <h2>LAYER CONTROLS <button class="collapse-btn" onclick="togglePanel('left')">&lt;&lt;</button></h2>
+            <div class="btn-group">
                 <button id="btn-radar" class="btn-toggle active" onclick="toggleLayer('radar')">RADAR: ON</button>
                 <button id="btn-rings" class="btn-toggle active" onclick="toggleLayer('rings')">RINGS: ON</button>
                 <button id="btn-roads" class="btn-toggle active" onclick="toggleLayer('roads')">ROADS: ON</button>
                 <button id="btn-nodes" class="btn-toggle active" onclick="toggleLayer('nodes')">NODES: ON</button>
             </div>
-
-            <!-- Weather Warnings -->
-            <div class="panel-header" style="margin-top: 8px;">
-                <span>NWS LOCAL HAZARD MONITOR</span>
-                <span id="alert-status-badge" style="color:#00ff66;">SYNCING</span>
+            <div class="btn-group" style="grid-template-columns: 1fr;">
+                <button id="btn-audio" class="btn-toggle active" onclick="toggleAudio()">AUDIO: ON</button>
+                <button class="btn-toggle" onclick="resetMapFocus()">RESET HQ VIEW</button>
             </div>
 
-            <div id="alert-box">
-                <div id="alert-title" style="font-weight: bold; color: #fff; margin-bottom: 2px;">SCANNING LOCAL ALERTS...</div>
-                <div id="alert-details" style="color: rgba(255,255,255,0.7);">Targeting Gage County sector for active weather hazards.</div>
-            </div>
-
-            <!-- USGS Hydrology Monitor -->
-            <div class="panel-header" style="margin-top: 8px;">
-                <span>USGS RIVER HYDROLOGY</span>
-                <span id="usgs-status" style="color:#00ff66;">SYNCING</span>
-            </div>
-            <div class="telemetry-row"><span class="label">LOCATION:</span><span class="val">BIG BLUE RIVER AT BEATRICE</span></div>
-            <div class="telemetry-row"><span class="label">GAUGE HEIGHT:</span><span id="river-stage" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">ACTION STAGE:</span><span class="val" style="color:#ffaa00;">14.0 FT</span></div>
-            <div class="telemetry-row"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
-
-            <!-- Surface Conditions -->
-            <div class="panel-header" style="margin-top: 8px;">
-                <span>SURFACE CONDITIONS</span>
-                <span id="weather-status" style="color:#00ff66;">CONNECTING</span>
-            </div>
-
-            <div class="telemetry-row"><span class="label">TEMPERATURE:</span><span id="weather-temp" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">FEELS LIKE:</span><span id="weather-feels" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">HUMIDITY:</span><span id="weather-humidity" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">WIND VECTOR:</span><span id="weather-wind" class="val">FETCHING...</span></div>
-            <div class="telemetry-row"><span class="label">BARO PRESSURE:</span><span id="weather-baro" class="val">FETCHING...</span></div>
+            <h2 style="margin-top: 10px;">SECTOR NODES</h2>
+            <div id="node-list" class="node-list"></div>
         </div>
 
-        <!-- Right Sector Nodes Panel -->
-        <div class="hud-panel hud-right">
-            <div class="panel-header">
-                <span>SECTOR TARGET NODES</span>
-                <button class="btn-toggle" style="font-size: 9px; padding: 2px 6px;" onclick="resetMapFocus()">RESET HQ</button>
+        <!-- Right Sidebar: Weather & Alerts -->
+        <div id="sidebar-right" class="hud-panel sidebar-right">
+            <h2>NWS HAZARD ALERTS <button class="collapse-btn" onclick="togglePanel('right')">&gt;&gt;</button></h2>
+            <div id="alert-box">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 3px;">
+                    <span id="alert-title">INITIALIZING...</span>
+                    <span id="alert-status-badge" style="color: #00ff66;">SYNCING</span>
+                </div>
+                <div id="alert-details" style="font-size: 10px; color: rgba(255,255,255,0.8);">Querying NWS alert feeds for Gage County zones...</div>
             </div>
-            <div id="node-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+
+            <h2 style="margin-top: 10px;">SURFACE METRICS</h2>
+            <div class="metric-row"><span class="metric-label">TEMPERATURE</span><span id="weather-temp" class="metric-value">--°F</span></div>
+            <div class="metric-row"><span class="metric-label">FEELS LIKE</span><span id="weather-feels" class="metric-value">--°F</span></div>
+            <div class="metric-row"><span class="metric-label">HUMIDITY</span><span id="weather-humidity" class="metric-value">--%</span></div>
+            <div class="metric-row"><span class="metric-label">WIND SPEED</span><span id="weather-wind" class="metric-value">-- MPH</span></div>
+            <div class="metric-row"><span class="metric-label">BAROMETER</span><span id="weather-baro" class="metric-value">-- inHg</span></div>
+            <div class="metric-row"><span class="metric-label">METEO STATUS</span><span id="weather-status" class="metric-value">STANDBY</span></div>
         </div>
 
         <!-- Footer -->
-        <div class="hud-panel hud-footer">
-            <div id="system-health-label">SYSTEM HEALTH: NOMINAL</div>
-            <div>GAGE COUNTY EMERGENCY MANAGEMENT FIELD FEED</div>
-            <div>MODE: REALTIME GEODETIC HUD (MULTI-SCREEN SYNC)</div>
-        </div>
-
+        <footer class="hud-panel">
+            <div><span id="system-health-label">SYSTEM HEALTH: NOMINAL</span></div>
+            <div>RADAR FEED: <span id="radar-status" style="color: #00ff66;">ONLINE</span> (<span id="radar-sync-time">PENDING</span>)</div>
+            <div>MULTI-SYNC: <span id="sync-status" style="color: #ffaa00;">CONNECTING...</span></div>
+        </footer>
     </div>
 
     <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
+        // Robust Grid-Based Panel Slide Collapse Handler
+        function togglePanel(side) {
+            playHudSound('click');
+            const container = document.getElementById('hud-container');
+            if (side === 'left') {
+                container.classList.toggle('left-collapsed');
+            } else if (side === 'right') {
+                container.classList.toggle('right-collapsed');
+            }
+            setTimeout(() => { map.invalidateSize(); }, 350);
+        }
+
         // Sector State & Config
         const hqLat = 40.2681;
         const hqLng = -96.7470;
-        let mapCenter = [hqLat, hqLng];
-        let hoveredNodeId = null;
         let selectedNodeId = null;
+        let hoveredNodeId = null;
         let lastRadarSyncTime = null;
         let audioEnabled = true;
-        let networkErrors = { nws: 0, weather: 0, usgs: 0, radarTiles: 0 };
+        let networkErrors = { nws: 0, weather: 0, radarTiles: 0 };
 
-        // Layer Visibility Toggles
         const layerConfig = { radar: true, rings: true, roads: true, nodes: true };
 
-        // --- MULTI-DEVICE WEBSOCKET SYNC ENGINE ---
+        // MQTT Multi-Device Sync Engine
         const myClientId = 'HUD_' + Math.random().toString(36).substring(2, 9);
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room') || 'GAGE-HUD-1';
         const syncTopic = `gage_county_eoc/sync/${roomId}`;
-
         document.getElementById('sync-room-id').innerText = roomId;
 
         let mqttClient = null;
-
         function initSyncEngine() {
             const syncStatusEl = document.getElementById('sync-status');
             try {
@@ -442,13 +189,8 @@
                 });
 
                 mqttClient.on('connect', () => {
-                    if (syncStatusEl) {
-                        syncStatusEl.innerText = 'ONLINE';
-                        syncStatusEl.style.color = '#00ff66';
-                    }
-                    mqttClient.subscribe(syncTopic, (err) => {
-                        if (err) console.warn('Sync subscribe error:', err);
-                    });
+                    if (syncStatusEl) { syncStatusEl.innerText = 'ONLINE'; syncStatusEl.style.color = '#00ff66'; }
+                    mqttClient.subscribe(syncTopic);
                 });
 
                 mqttClient.on('message', (topic, message) => {
@@ -457,42 +199,19 @@
                         if (data && data.sender !== myClientId) {
                             applyRemoteSyncAction(data.action, data.payload);
                         }
-                    } catch (e) {
-                        console.warn('Sync message parse error:', e);
-                    }
+                    } catch (e) { console.warn('Sync parse error:', e); }
                 });
 
-                mqttClient.on('error', () => {
-                    if (syncStatusEl) {
-                        syncStatusEl.innerText = 'DEGRADED';
-                        syncStatusEl.style.color = '#ffaa00';
-                    }
-                });
-
-                mqttClient.on('offline', () => {
-                    if (syncStatusEl) {
-                        syncStatusEl.innerText = 'OFFLINE';
-                        syncStatusEl.style.color = '#ff3344';
-                    }
-                });
+                mqttClient.on('error', () => { if (syncStatusEl) { syncStatusEl.innerText = 'DEGRADED'; syncStatusEl.style.color = '#ffaa00'; } });
+                mqttClient.on('offline', () => { if (syncStatusEl) { syncStatusEl.innerText = 'OFFLINE'; syncStatusEl.style.color = '#ff3344'; } });
             } catch (err) {
-                console.warn('Sync Engine initialization error:', err);
-                if (syncStatusEl) {
-                    syncStatusEl.innerText = 'ERROR';
-                    syncStatusEl.style.color = '#ff3344';
-                }
+                if (syncStatusEl) { syncStatusEl.innerText = 'ERROR'; syncStatusEl.style.color = '#ff3344'; }
             }
         }
 
         function broadcastAction(action, payload = {}) {
             if (mqttClient && mqttClient.connected) {
-                const message = JSON.stringify({
-                    sender: myClientId,
-                    action: action,
-                    payload: payload,
-                    timestamp: Date.now()
-                });
-                mqttClient.publish(syncTopic, message);
+                mqttClient.publish(syncTopic, JSON.stringify({ sender: myClientId, action, payload, timestamp: Date.now() }));
             }
         }
 
@@ -508,10 +227,7 @@
             } else if (action === 'RESET_HQ') {
                 resetMapFocus(true);
             } else if (action === 'TOGGLE_LAYER') {
-                const { layerKey, state } = payload;
-                if (layerConfig[layerKey] !== state) {
-                    toggleLayer(layerKey, true);
-                }
+                if (layerConfig[payload.layerKey] !== payload.state) toggleLayer(payload.layerKey, true);
             }
         }
 
@@ -522,12 +238,10 @@
             try {
                 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
-
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 const now = audioCtx.currentTime;
 
                 if (type === 'click') {
@@ -536,20 +250,16 @@
                     osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
                     gain.gain.setValueAtTime(0.15, now);
                     gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
-                    osc.start(now);
-                    osc.stop(now + 0.05);
+                    osc.start(now); osc.stop(now + 0.05);
                 } else if (type === 'warning') {
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(440, now);
                     osc.frequency.setValueAtTime(880, now + 0.15);
                     gain.gain.setValueAtTime(0.2, now);
                     gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
-                    osc.start(now);
-                    osc.stop(now + 0.35);
+                    osc.start(now); osc.stop(now + 0.35);
                 }
-            } catch (e) {
-                console.warn('Audio synth error:', e);
-            }
+            } catch (e) {}
         }
 
         function toggleAudio() {
@@ -568,25 +278,17 @@
             const btn = document.getElementById(`btn-${layerKey}`);
             if (btn) btn.className = layerConfig[layerKey] ? 'btn-toggle active' : 'btn-toggle';
 
-            if (layerKey === 'radar' && weatherLayer) {
-                weatherLayer.setOpacity(layerConfig.radar ? 0.65 : 0.0);
-            }
-            if (layerKey === 'roads' && roadLayer) {
-                roadLayer.setOpacity(layerConfig.roads ? 0.85 : 0.0);
-            }
+            if (layerKey === 'radar' && weatherLayer) weatherLayer.setOpacity(layerConfig.radar ? 0.65 : 0.0);
+            if (layerKey === 'roads' && roadLayer) roadLayer.setOpacity(layerConfig.roads ? 0.85 : 0.0);
 
-            if (!isRemote) {
-                broadcastAction('TOGGLE_LAYER', { layerKey: layerKey, state: layerConfig[layerKey] });
-            }
+            if (!isRemote) broadcastAction('TOGGLE_LAYER', { layerKey, state: layerConfig[layerKey] });
         }
 
-        // Fetch Helper
         async function fetchWithTimeout(url, options = {}) {
-            const { timeout = 8000, headers = {} } = options;
             const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
+            const id = setTimeout(() => controller.abort(), options.timeout || 8000);
             try {
-                const res = await fetch(url, { ...options, headers, signal: controller.signal });
+                const res = await fetch(url, { ...options, signal: controller.signal });
                 clearTimeout(id);
                 return res;
             } catch (err) {
@@ -595,12 +297,10 @@
             }
         }
 
-        // System Health Monitor
         function updateSystemHealth() {
             const beacon = document.getElementById('status-beacon');
             const healthLabel = document.getElementById('system-health-label');
-            const totalErrors = networkErrors.nws + networkErrors.weather + networkErrors.usgs + networkErrors.radarTiles;
-
+            const totalErrors = networkErrors.nws + networkErrors.weather + networkErrors.radarTiles;
             if (!beacon || !healthLabel) return;
 
             if (totalErrors === 0) {
@@ -609,7 +309,7 @@
                 healthLabel.style.color = 'rgba(255, 255, 255, 0.7)';
             } else if (totalErrors < 3) {
                 beacon.className = 'beacon degraded';
-                healthLabel.innerText = 'SYSTEM HEALTH: DEGRADED (RETRIEVING)';
+                healthLabel.innerText = 'SYSTEM HEALTH: DEGRADED';
                 healthLabel.style.color = '#ffaa00';
             } else {
                 beacon.className = 'beacon error';
@@ -618,41 +318,19 @@
             }
         }
 
-        // 1. Leaflet Map Initialization
-        const map = L.map('map', {
-            center: [hqLat, hqLng],
-            zoom: 10,
-            zoomControl: false,
-            dragging: true,
-            scrollWheelZoom: true,
-            doubleClickZoom: false,
-            attributionControl: false
-        });
-
-        // ESRI Base Map
+        // Map Initialization
+        const map = L.map('map', { center: [hqLat, hqLng], zoom: 10, zoomControl: false, attributionControl: false });
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
-
-        // ESRI Vector Roads Overlay
-        const roadLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 16,
-            className: 'road-tile-layer',
-            zIndex: 150
-        }).addTo(map);
-
-        // NEXRAD Doppler Radar Layer
-        const weatherLayer = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', {
-            opacity: 0.65,
-            maxZoom: 16,
-            zIndex: 200
-        }).addTo(map);
-
+        
+        const roadLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, zIndex: 150 }).addTo(map);
+        
+        const weatherLayer = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', { opacity: 0.65, maxZoom: 16, zIndex: 200 }).addTo(map);
         weatherLayer.on('tileload', () => {
             if (networkErrors.radarTiles > 0) networkErrors.radarTiles--;
             document.getElementById('radar-status').innerText = 'ONLINE';
             document.getElementById('radar-status').style.color = '#00ff66';
             updateSystemHealth();
         });
-
         weatherLayer.on('tileerror', () => {
             networkErrors.radarTiles = Math.min(networkErrors.radarTiles + 1, 5);
             document.getElementById('radar-status').innerText = networkErrors.radarTiles > 2 ? 'OFFLINE' : 'DEGRADED';
@@ -667,68 +345,15 @@
         refreshRadarTileFeed();
         setInterval(refreshRadarTileFeed, 90000);
 
-        // 2. Gage County Boundary Layer
+        // County Boundary
         fetchWithTimeout('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json', { timeout: 10000 })
             .then(res => res.json())
             .then(data => {
                 const gageFeature = data.features ? data.features.find(f => f.id === "31067") : null;
-                if (gageFeature) {
-                    L.geoJSON(gageFeature, {
-                        style: { color: 'rgba(0, 255, 102, 0.35)', weight: 1.2, dashArray: '4, 6', fillOpacity: 0.0 }
-                    }).addTo(map);
-                }
-            })
-            .catch(err => console.warn('Boundary deferred:', err));
+                if (gageFeature) L.geoJSON(gageFeature, { style: { color: 'rgba(0, 255, 102, 0.35)', weight: 1.2, dashArray: '4, 6', fillOpacity: 0.0 } }).addTo(map);
+            }).catch(() => {});
 
-        // 3. USGS Big Blue River Hydrology Monitor
-        async function updateUsgsRiverStage() {
-            const stageEl = document.getElementById('river-stage');
-            const usgsStatusEl = document.getElementById('usgs-status');
-
-            try {
-                const url = 'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=06884000&parameterCd=00065';
-                const res = await fetchWithTimeout(url, { timeout: 7000 });
-                if (!res.ok) throw new Error(`USGS HTTP ${res.status}`);
-                
-                const data = await res.json();
-                const timeSeries = data.value?.timeSeries[0];
-                const latestValue = timeSeries?.values[0]?.value[0]?.value;
-
-                if (latestValue !== undefined) {
-                    const feet = parseFloat(latestValue).toFixed(2);
-                    stageEl.innerText = `${feet} FT`;
-
-                    if (feet >= 18.0) {
-                        stageEl.style.color = '#ff3344';
-                        stageEl.innerText += ' [MAJOR FLOOD]';
-                    } else if (feet >= 14.0) {
-                        stageEl.style.color = '#ffaa00';
-                        stageEl.innerText += ' [ACTION STAGE]';
-                    } else {
-                        stageEl.style.color = '#00ccff';
-                    }
-
-                    usgsStatusEl.innerText = 'ONLINE';
-                    usgsStatusEl.style.color = '#00ff66';
-                    networkErrors.usgs = 0;
-                }
-            } catch (err) {
-                console.warn('USGS Hydrology Error:', err);
-                networkErrors.usgs = Math.min(networkErrors.usgs + 1, 5);
-                if (networkErrors.usgs > 2) {
-                    stageEl.innerText = 'OFFLINE';
-                    stageEl.style.color = '#ffaa00';
-                    usgsStatusEl.innerText = 'DEGRADED';
-                    usgsStatusEl.style.color = '#ffaa00';
-                }
-            } finally {
-                updateSystemHealth();
-            }
-        }
-        updateUsgsRiverStage();
-        setInterval(updateUsgsRiverStage, 180000);
-
-        // 4. NWS Active Alerts
+        // NWS Hazard Alerts Engine
         let warningsLayer = null;
         let lastHadSevereWarning = false;
 
@@ -739,86 +364,85 @@
             const alertBadge = document.getElementById('alert-status-badge');
 
             try {
-                const res = await fetchWithTimeout('https://api.weather.gov/alerts/active?area=NE', {
-                    headers: { 'User-Agent': '(GageCountyEOCMonitor, contact@gagecounty.org)' },
-                    timeout: 8000
-                });
+                let activeFeatures = [];
+                const endpoints = [
+                    'https://api.weather.gov/alerts/active/zone/NEZ089',
+                    'https://api.weather.gov/alerts/active/zone/NEC067',
+                    `https://api.weather.gov/alerts/active?point=${hqLat},${hqLng}`
+                ];
 
-                if (!res.ok) throw new Error(`NWS API HTTP ${res.status}`);
-                const data = await res.json();
+                for (const endpoint of endpoints) {
+                    try {
+                        const res = await fetchWithTimeout(endpoint, {
+                            headers: { 'User-Agent': '(GageCountyEOCMonitor/2.0, contact@gagecounty.org)' },
+                            cache: 'no-store',
+                            timeout: 6000
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && data.features) {
+                                data.features.forEach(f => {
+                                    if (!activeFeatures.some(existing => existing.id === f.id)) activeFeatures.push(f);
+                                });
+                            }
+                        }
+                    } catch (e) {}
+                }
 
                 if (warningsLayer) map.removeLayer(warningsLayer);
-
-                const gageFeatures = (data.features || []).filter(feature => {
-                    const props = feature.properties || {};
-                    const area = (props.areaDesc || '').toLowerCase();
-                    const ugc = (props.geocode && props.geocode.UGC) ? props.geocode.UGC : [];
-                    return area.includes('gage') || ugc.includes('NEZ089') || ugc.includes('NEC067');
-                });
-
                 let activeHazards = [];
 
-                warningsLayer = L.geoJSON({ type: 'FeatureCollection', features: gageFeatures }, {
+                warningsLayer = L.geoJSON({ type: 'FeatureCollection', features: activeFeatures }, {
                     style: function(feature) {
-                        const eventName = (feature.properties?.event) || '';
-                        if (eventName.includes('Tornado')) return { color: '#ff0033', weight: 3, fillColor: '#ff0033', fillOpacity: 0.35 };
-                        if (eventName.includes('Severe Thunderstorm')) return { color: '#ff7700', weight: 2.5, fillColor: '#ff7700', fillOpacity: 0.30 };
-                        if (eventName.includes('Flood')) return { color: '#00ffcc', weight: 2.5, fillColor: '#00ffcc', fillOpacity: 0.30 };
-                        return { color: '#ffff00', weight: 2, fillColor: '#ffff00', fillOpacity: 0.15 };
+                        const event = (feature.properties?.event || '').toLowerCase();
+                        if (event.includes('tornado')) return { color: '#ff0033', weight: 3.5, fillOpacity: 0.40 };
+                        if (event.includes('severe thunderstorm')) return { color: '#ff7700', weight: 3, fillOpacity: 0.35 };
+                        if (event.includes('watch')) return { color: '#ffaa00', weight: 2.5, fillOpacity: 0.25 };
+                        return { color: '#ffff00', weight: 2, fillOpacity: 0.20 };
                     },
-                    onEachFeature: function(feature) {
-                        if (feature.properties?.event && !activeHazards.includes(feature.properties.event)) {
-                            activeHazards.push(feature.properties.event);
-                        }
+                    onEachFeature: function(feature, layer) {
+                        const event = feature.properties?.event;
+                        if (event && !activeHazards.includes(event)) activeHazards.push(event);
+                        layer.bindPopup(`<div style="color:#000; font-family:JetBrains Mono; font-size:11px;"><b>${event}</b></div>`);
                     }
                 }).addTo(map);
 
                 if (activeHazards.length > 0) {
-                    const primary = activeHazards[0];
-                    const hasWarning = activeHazards.some(h => h.includes('Warning'));
-                    
+                    const hasWarning = activeHazards.some(h => h.toLowerCase().includes('warning'));
+                    const hasWatch = activeHazards.some(h => h.toLowerCase().includes('watch'));
+
                     if (hasWarning && !lastHadSevereWarning) {
                         playHudSound('warning');
                         lastHadSevereWarning = true;
                     }
 
-                    if (alertBox) alertBox.className = hasWarning ? 'active-warning' : 'active-advisory';
-                    if (alertBadge) {
-                        alertBadge.innerText = hasWarning ? 'WARNING ACTIVE' : 'ADVISORY ACTIVE';
-                        alertBadge.style.color = hasWarning ? '#ff3344' : '#ffaa00';
-                    }
-                    if (alertTitle) alertTitle.innerText = activeHazards.length > 1 ? `${activeHazards.length} ACTIVE HAZARDS` : primary.toUpperCase();
-                    if (alertDetails) alertDetails.innerText = activeHazards.join(' | ');
+                    alertBox.className = hasWarning ? 'active-warning' : (hasWatch ? 'active-watch' : 'active-advisory');
+                    alertBadge.innerText = hasWarning ? 'WARNING' : 'ACTIVE';
+                    alertBadge.style.color = hasWarning ? '#ff3344' : '#ffaa00';
+                    alertTitle.innerText = activeHazards[0].toUpperCase();
+                    alertDetails.innerText = activeHazards.join(' | ');
                 } else {
                     lastHadSevereWarning = false;
-                    if (alertBox) alertBox.className = '';
-                    if (alertBadge) {
-                        alertBadge.innerText = 'CLEAR';
-                        alertBadge.style.color = '#00ff66';
-                    }
-                    if (alertTitle) alertTitle.innerText = 'NO ACTIVE ALERTS';
-                    if (alertDetails) alertDetails.innerText = 'No severe warnings, watches, or advisories active in Beatrice / Gage County sector.';
+                    alertBox.className = '';
+                    alertBadge.innerText = 'CLEAR';
+                    alertBadge.style.color = '#00ff66';
+                    alertTitle.innerText = 'NO ACTIVE ALERTS';
+                    alertDetails.innerText = 'No severe watches or warnings active in sector.';
                 }
-
                 networkErrors.nws = 0;
-
             } catch (err) {
-                console.warn('NWS Alerts Warning:', err.message || err);
                 networkErrors.nws = Math.min(networkErrors.nws + 1, 5);
-            } finally {
-                updateSystemHealth();
-            }
+            } finally { updateSystemHealth(); }
         }
         updateNwsAlerts();
         setInterval(updateNwsAlerts, 60000);
 
-        // 5. Open-Meteo Surface Weather
+        // Surface Weather
         async function updateWeatherData() {
             try {
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${hqLat}&longitude=${hqLng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,apparent_temperature,pressure_msl&temperature_unit=fahrenheit&wind_speed_unit=mph`;
                 const res = await fetchWithTimeout(url, { timeout: 8000 });
-                const data = await res.json();
-                const cur = data.current;
+                const cur = (await res.json()).current;
 
                 document.getElementById('weather-temp').innerText = `${Math.round(cur.temperature_2m)}°F`;
                 document.getElementById('weather-feels').innerText = `${Math.round(cur.apparent_temperature)}°F`;
@@ -829,14 +453,12 @@
                 networkErrors.weather = 0;
             } catch (e) {
                 networkErrors.weather = Math.min(networkErrors.weather + 1, 5);
-            } finally {
-                updateSystemHealth();
-            }
+            } finally { updateSystemHealth(); }
         }
         updateWeatherData();
         setInterval(updateWeatherData, 120000);
 
-        // 6. Sector Target Nodes
+        // Nodes & Radar Sweep
         const countyNodes = [
             { id: "NODE-BEA", name: "BEATRICE", coords: [40.2681, -96.7470], intensity: 0 },
             { id: "NODE-WYM", name: "WYMORE", coords: [40.1206, -96.6628], intensity: 0 },
@@ -849,31 +471,15 @@
             { id: "NODE-AIR", name: "GAGE CTY ARPT", coords: [40.3014, -96.7539], intensity: 0 }
         ];
 
-        function calculateBearing(lat1, lon1, lat2, lon2) {
-            const rad = Math.PI / 180;
-            const dLon = (lon2 - lon1) * rad;
-            const y = Math.sin(dLon) * Math.cos(lat2 * rad);
-            const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
-            return ((Math.atan2(y, x) * (180 / Math.PI)) + 360) % 360;
-        }
-
         function initNodeListUI() {
             const container = document.getElementById('node-list');
             if (!container) return;
             container.innerHTML = '';
-            
             countyNodes.forEach(node => {
                 const card = document.createElement('div');
                 card.id = `card-${node.id}`;
                 card.className = 'node-card';
-                card.innerHTML = `
-                    <div class="node-title">
-                        <span>${node.name}</span>
-                        <span>${node.id}</span>
-                    </div>
-                    <div class="node-sub" id="sub-${node.id}">CALCULATING...</div>
-                `;
-
+                card.innerHTML = `<div class="node-title"><span>${node.name}</span><span>${node.id}</span></div><div class="node-sub" id="sub-${node.id}">CALCULATING...</div>`;
                 card.addEventListener('mouseenter', () => { hoveredNodeId = node.id; });
                 card.addEventListener('mouseleave', () => { hoveredNodeId = null; });
                 card.addEventListener('click', () => {
@@ -883,7 +489,6 @@
                     map.flyTo(node.coords, 12, { duration: 1.2 });
                     broadcastAction('SELECT_NODE', { nodeId: node.id });
                 });
-
                 container.appendChild(card);
             });
         }
@@ -893,9 +498,7 @@
             playHudSound('click');
             selectedNodeId = null;
             map.flyTo([hqLat, hqLng], 10, { duration: 1.2 });
-            if (!isRemote) {
-                broadcastAction('RESET_HQ');
-            }
+            if (!isRemote) broadcastAction('RESET_HQ');
         }
 
         function updateNodeListUI() {
@@ -905,25 +508,15 @@
                 const sub = document.getElementById(`sub-${node.id}`);
                 if (!card || !sub) return;
 
-                if (selectedNodeId === node.id) {
-                    card.classList.add('selected');
-                } else {
-                    card.classList.remove('selected');
-                }
-
-                const nodeLatLng = L.latLng(node.coords[0], node.coords[1]);
-                const distMiles = (centerLatLng.distanceTo(nodeLatLng) / 1609.344).toFixed(1);
-                const brg = calculateBearing(centerLatLng.lat, centerLatLng.lng, node.coords[0], node.coords[1]);
-
-                sub.innerText = `BEARING: ${Math.round(brg).toString().padStart(3, '0')}° | RANGE: ${distMiles} MI`;
+                card.className = selectedNodeId === node.id ? 'node-card selected' : 'node-card';
+                const distMiles = (centerLatLng.distanceTo(L.latLng(node.coords)) / 1609.344).toFixed(1);
+                sub.innerText = `RANGE: ${distMiles} MI`;
             });
         }
         setInterval(updateNodeListUI, 300);
 
-        // 7. Radar Canvas Sweep Engine
         const canvas = document.getElementById('radarCanvas');
         const ctx = canvas.getContext('2d');
-
         function syncCanvas() {
             const dpr = window.devicePixelRatio || 1;
             canvas.width = window.innerWidth * dpr;
@@ -934,151 +527,87 @@
         window.addEventListener('resize', syncCanvas);
         syncCanvas();
 
-        function getSafePoint(coords) {
-            try {
-                const pt = map.latLngToContainerPoint(coords);
-                return { x: pt.x, y: pt.y, valid: !isNaN(pt.x) && !isNaN(pt.y) };
-            } catch (e) {
-                return { x: 0, y: 0, valid: false };
-            }
-        }
-
         let sweepAngle = 0;
         let lastTime = performance.now();
 
         function renderRadar(now) {
             const dt = (now - lastTime) / 1000;
             lastTime = now;
-
             const w = window.innerWidth;
             const h = window.innerHeight;
             ctx.clearRect(0, 0, w, h);
 
-            const origin = getSafePoint([hqLat, hqLng]);
-            if (!origin.valid) {
+            const ptOrigin = map.latLngToContainerPoint([hqLat, hqLng]);
+            if (isNaN(ptOrigin.x) || isNaN(ptOrigin.y)) {
                 requestAnimationFrame(renderRadar);
                 return;
             }
-
-            const ox = origin.x;
-            const oy = origin.y;
+            const ox = ptOrigin.x;
+            const oy = ptOrigin.y;
             const maxRadius = Math.max(w, h) * 1.2;
 
-            // Range Rings
             if (layerConfig.rings) {
-                ctx.strokeStyle = 'rgba(0, 255, 102, 0.50)';
+                ctx.strokeStyle = 'rgba(0, 255, 102, 0.5)';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([5, 4]);
-
                 [5, 10, 15, 20, 25].forEach(miles => {
-                    const pt = getSafePoint([hqLat + (miles / 69.0), hqLng]);
-                    if (!pt.valid) return;
+                    const pt = map.latLngToContainerPoint([hqLat + (miles / 69.0), hqLng]);
                     const r = Math.abs(oy - pt.y);
-
                     ctx.beginPath();
                     ctx.arc(ox, oy, r, 0, Math.PI * 2);
                     ctx.stroke();
-
-                    // Ring Labels
-                    ctx.font = '700 9px "JetBrains Mono", monospace';
-                    ctx.fillStyle = 'rgba(4, 8, 12, 0.85)';
-                    ctx.fillRect(ox - 15, oy - r - 7, 30, 14);
-                    ctx.strokeStyle = 'rgba(0, 255, 102, 0.7)';
-                    ctx.strokeRect(ox - 15, oy - r - 7, 30, 14);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(`${miles}MI`, ox, oy - r + 3);
                 });
                 ctx.setLineDash([]);
-                ctx.textAlign = 'left';
             }
 
-            // Radar Sweep Beam
             if (layerConfig.radar) {
-                const tailSteps = 40;
-                for (let i = 0; i < tailSteps; i++) {
+                for (let i = 0; i < 40; i++) {
                     const a = sweepAngle - (i * Math.PI / 180);
-                    ctx.fillStyle = `rgba(0, 255, 102, ${(1 - i / tailSteps) * 0.20})`;
+                    ctx.fillStyle = `rgba(0, 255, 102, ${(1 - i / 40) * 0.2})`;
                     ctx.beginPath();
                     ctx.moveTo(ox, oy);
                     ctx.arc(ox, oy, maxRadius, a - (Math.PI / 180), a);
                     ctx.fill();
                 }
-
-                ctx.strokeStyle = '#00ff66';
-                ctx.lineWidth = 1.2;
-                ctx.shadowColor = '#00ff66';
-                ctx.shadowBlur = 8;
-                ctx.beginPath();
-                ctx.moveTo(ox, oy);
-                ctx.lineTo(ox + maxRadius * Math.cos(sweepAngle), oy + maxRadius * Math.sin(sweepAngle));
-                ctx.stroke();
-                ctx.shadowBlur = 0;
             }
 
-            // Sector Town Blips
             if (layerConfig.nodes) {
                 countyNodes.forEach(node => {
-                    const pt = getSafePoint(node.coords);
-                    if (!pt.valid) return;
+                    const pt = map.latLngToContainerPoint(node.coords);
+                    if (isNaN(pt.x)) return;
 
                     let nodeAngle = Math.atan2(pt.y - oy, pt.x - ox);
                     if (nodeAngle < 0) nodeAngle += Math.PI * 2;
-
                     let diff = sweepAngle - nodeAngle;
                     if (diff < 0) diff += Math.PI * 2;
-
                     if (diff < 0.04) node.intensity = 1.0;
 
                     if (node.intensity > 0.02) {
                         ctx.fillStyle = `rgba(255, 255, 255, ${node.intensity})`;
-                        ctx.beginPath();
-                        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-                        ctx.fill();
-
-                        ctx.strokeStyle = `rgba(0, 255, 102, ${node.intensity})`;
-                        ctx.beginPath();
-                        ctx.arc(pt.x, pt.y, 14 * (1.2 - node.intensity), 0, Math.PI * 2);
-                        ctx.stroke();
-
+                        ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = `rgba(0, 255, 102, ${node.intensity})`;
-                        ctx.font = '600 11px JetBrains Mono, monospace';
+                        ctx.font = '600 11px JetBrains Mono';
                         ctx.fillText(node.name, pt.x + 8, pt.y + 3);
-
                         node.intensity *= 0.985;
-                    }
-
-                    // Hover & Selected Lock Reticles
-                    if (hoveredNodeId === node.id || selectedNodeId === node.id) {
-                        ctx.strokeStyle = selectedNodeId === node.id ? '#ffff00' : '#ffffff';
-                        ctx.lineWidth = 1.5;
-                        ctx.strokeRect(pt.x - 10, pt.y - 10, 20, 20);
                     }
                 });
             }
 
             sweepAngle += 0.5 * dt;
             if (sweepAngle >= Math.PI * 2) sweepAngle = 0;
-
             requestAnimationFrame(renderRadar);
         }
 
-        // Clock Update Loop
         setInterval(() => {
             const now = new Date();
             document.getElementById('utc-clock').innerText = now.toISOString().replace('T', ' ').substring(11, 19) + " UTC";
-
             const syncEl = document.getElementById('radar-sync-time');
-            if (syncEl) {
-                if (!lastRadarSyncTime) syncEl.innerText = "PENDING";
-                else {
-                    const sec = Math.floor((now - lastRadarSyncTime) / 1000);
-                    syncEl.innerText = sec < 10 ? "JUST NOW" : `${sec}s AGO`;
-                }
+            if (syncEl && lastRadarSyncTime) {
+                const sec = Math.floor((now - lastRadarSyncTime) / 1000);
+                syncEl.innerText = sec < 10 ? "JUST NOW" : `${sec}sAGO`;
             }
         }, 1000);
 
-        // Start engines
         initSyncEngine();
         requestAnimationFrame(renderRadar);
     </script>
