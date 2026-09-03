@@ -411,6 +411,34 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
+        // --- KEEP-AWAKE & AUTO-REFRESH ENGINES ---
+        // 1. Screen Wake Lock API (Prevents screen/device from going to sleep)
+        let wakeLock = null;
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Screen Wake Lock released');
+                    });
+                } catch (err) {
+                    console.warn(`Wake Lock error: ${err.name}, ${err.message}`);
+                }
+            }
+        }
+
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+        requestWakeLock();
+
+        // 2. Periodic Safety Reload (Refreshes page every 4 hours to clear cache/memory leaks during long shifts)
+        setTimeout(() => {
+            location.reload();
+        }, 4 * 60 * 60 * 1000);
+
         // Sector State & Config
         const hqLat = 40.2681;
         const hqLng = -96.7470;
