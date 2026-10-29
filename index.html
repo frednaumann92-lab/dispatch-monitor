@@ -7,6 +7,8 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Tactical HUD Font -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
     <!-- MQTT WebSocket Engine -->
@@ -88,6 +90,58 @@
             grid-template-columns: 340px 1fr 340px;
             padding: 12px;
             gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        /* TV Display Mode Styling */
+        body.tv-mode .hud-left,
+        body.tv-mode .hud-right,
+        body.tv-mode .hud-footer {
+            display: none !important;
+        }
+
+        body.tv-mode .hud-overlay {
+            grid-template-rows: 55px 1fr 50px;
+            grid-template-columns: 1fr;
+        }
+
+        #tv-weather-ticker {
+            display: none;
+            grid-column: 1 / -1;
+            grid-row: 3;
+            background: rgba(6, 12, 18, 0.95);
+            border: 1px solid var(--border-line);
+            border-radius: 4px;
+            align-items: center;
+            justify-content: space-around;
+            padding: 0 20px;
+            font-size: 13px;
+            font-weight: bold;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
+            pointer-events: auto;
+        }
+
+        body.tv-mode #tv-weather-ticker {
+            display: flex !important;
+        }
+
+        /* Bottom-Right Floating Tactical Wind Gauge Widget */
+        #tactical-wind-widget {
+            position: absolute;
+            bottom: 45px;
+            right: 12px;
+            width: 340px;
+            z-index: 1200;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-line);
+            border-radius: 4px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
+            padding: 10px 14px;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .hud-panel {
@@ -138,7 +192,7 @@
 
         .header-stats {
             display: flex;
-            gap: 16px;
+            gap: 12px;
             font-size: 11px;
             align-items: center;
         }
@@ -199,19 +253,13 @@
             letter-spacing: 1px;
             display: flex;
             justify-content: space-between;
+            width: 100%;
         }
 
         .telemetry-row {
             display: flex;
             justify-content: space-between;
             line-height: 1.4;
-        }
-
-        /* Enlarged font style for River Hydrology & Surface Conditions */
-        .telemetry-row.enlarged {
-            font-size: 13px;
-            font-weight: 600;
-            padding: 2px 0;
         }
 
         .label { color: rgba(0, 255, 102, 0.65); }
@@ -301,19 +349,38 @@
         <canvas id="radarCanvas"></canvas>
     </div>
 
+    <!-- Bottom-Right Tactical Wind Gauge Widget -->
+    <div id="tactical-wind-widget">
+        <div class="panel-header">
+            <span>TACTICAL WIND GAUGE</span>
+            <span style="color:#00ccff;" id="wind-widget-speed">-- MPH</span>
+        </div>
+        <div style="padding: 8px 0; display: flex; align-items: center; justify-content: center;">
+            <canvas id="windGaugeCanvas" width="120" height="120"></canvas>
+        </div>
+        <div class="telemetry-row" style="width:100%; font-size:10px;">
+            <span class="label">VECTOR:</span>
+            <span id="wind-widget-vector" class="val">CALCULATING...</span>
+        </div>
+    </div>
+
     <div class="hud-overlay">
         
         <!-- Header -->
         <div class="hud-panel hud-header">
             <div class="sys-title">
                 <div id="status-beacon" class="beacon"></div>
-                GAGE COUNTY EOC // HIGH-RES RADAR & SEVERE WEATHER HUD
+                GAGE COUNTY EOC // RADAR HUD
             </div>
             <div class="header-stats">
-                <div class="stat-item">SYNC ROOM: <span id="sync-room-id">GAGE-HUD-1</span> (<span id="sync-status" style="color:#ffaa00;">CONNECTING</span>)</div>
+                <div class="stat-item">
+                    ROOM: <span id="sync-room-id" style="cursor:pointer; text-decoration:underline;" onclick="changeRoomPrompt()">GAGE-HUD-1</span> 
+                    (<span id="sync-status" style="color:#ffaa00;">CONNECTING</span>)
+                </div>
+                <button class="btn-toggle" style="font-size: 9px;" onclick="forceSyncState()">FORCE RESYNC</button>
+                <button id="btn-tvmode" class="btn-toggle" onclick="toggleTvMode()">TV DISPLAY MODE</button>
                 <button id="btn-audio" class="btn-toggle active" onclick="toggleAudio()">AUDIO: ON</button>
                 <div class="stat-item">HQ: <span>BEATRICE, NE</span></div>
-                <div class="stat-item">GRID: <span>40.2681° N / 96.7470° W</span></div>
                 <div class="stat-item">TIME: <span id="utc-clock">00:00:00 UTC</span></div>
             </div>
         </div>
@@ -370,58 +437,46 @@
                 <div id="alert-details" style="color: rgba(255,255,255,0.7);">Targeting Gage County sector for active weather hazards.</div>
             </div>
 
-            <!-- USGS Hydrology Monitor (Enlarged) -->
+            <!-- USGS Hydrology Monitor -->
             <div class="panel-header" style="margin-top: 8px;">
                 <span>USGS RIVER HYDROLOGY</span>
                 <span id="usgs-status" style="color:#00ff66;">SYNCING</span>
             </div>
-            <div class="telemetry-row enlarged"><span class="label">LOCATION:</span><span class="val">BIG BLUE RIVER AT BEATRICE</span></div>
-            <div class="telemetry-row enlarged"><span class="label">GAUGE HEIGHT:</span><span id="river-stage" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">ACTION STAGE:</span><span class="val" style="color:#ffaa00;">14.0 FT</span></div>
-            <div class="telemetry-row enlarged"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
+            <div class="telemetry-row"><span class="label">LOCATION:</span><span class="val">BIG BLUE RIVER AT BEATRICE</span></div>
+            <div class="telemetry-row"><span class="label">GAUGE HEIGHT:</span><span id="river-stage" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">ACTION STAGE:</span><span class="val" style="color:#ffaa00;">14.0 FT</span></div>
+            <div class="telemetry-row"><span class="label">FLOOD STAGE:</span><span class="val" style="color:#ff3344;">18.0 FT</span></div>
 
-            <!-- Surface Conditions (Enlarged) -->
+            <!-- Surface Conditions -->
             <div class="panel-header" style="margin-top: 8px;">
                 <span>SURFACE CONDITIONS</span>
                 <span id="weather-status" style="color:#00ff66;">CONNECTING</span>
             </div>
 
-            <div class="telemetry-row enlarged"><span class="label">TEMPERATURE:</span><span id="weather-temp" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">FEELS LIKE:</span><span id="weather-feels" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">HUMIDITY:</span><span id="weather-humidity" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">WIND VECTOR:</span><span id="weather-wind" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">WIND GUSTS:</span><span id="weather-gusts" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">CLOUD COVER:</span><span id="weather-cloud" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">PRECIPITATION:</span><span id="weather-precip" class="val">FETCHING...</span></div>
-            <div class="telemetry-row enlarged"><span class="label">BARO PRESSURE:</span><span id="weather-baro" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">TEMPERATURE:</span><span id="weather-temp" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">FEELS LIKE:</span><span id="weather-feels" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">HUMIDITY:</span><span id="weather-humidity" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">WIND VECTOR:</span><span id="weather-wind" class="val">FETCHING...</span></div>
+            <div class="telemetry-row"><span class="label">BARO PRESSURE:</span><span id="weather-baro" class="val">FETCHING...</span></div>
         </div>
 
-        <!-- Right Sector Nodes & Local Clock Panel -->
+        <!-- Right Sector Nodes Panel -->
         <div class="hud-panel hud-right">
             <div class="panel-header">
                 <span>SECTOR TARGET NODES</span>
                 <button class="btn-toggle" style="font-size: 9px; padding: 2px 6px;" onclick="resetMapFocus()">RESET HQ</button>
             </div>
             <div id="node-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+        </div>
 
-            <!-- Central Time Military Clock Module -->
-            <div class="panel-header" style="margin-top: 10px;">
-                <span>CENTRAL TIME (LOCAL)</span>
-            </div>
-            <div style="background: rgba(0, 255, 102, 0.04); border: 1px solid rgba(0, 255, 102, 0.15); padding: 8px 10px; border-radius: 3px; display: flex; flex-direction: column; gap: 4px;">
-                <div class="telemetry-row">
-                    <span class="label">MIL READOUT:</span>
-                    <span id="central-mil-clock" class="val" style="font-weight: 800; color: #fff; font-size: 12px;">000000H</span>
-                </div>
-                <div class="telemetry-row">
-                    <span class="label">TIMEZONE:</span>
-                    <span id="central-zone-label" class="val">24H / CDT</span>
-                </div>
-                <div class="telemetry-row">
-                    <span class="label">LOCAL DATE:</span>
-                    <span id="central-date" class="val">----</span>
-                </div>
-            </div>
+        <!-- TV Mode Bottom Weather Ticker -->
+        <div id="tv-weather-ticker">
+            <div>TEMP: <span id="tv-temp" style="color:#fff;">--</span></div>
+            <div>FEELS: <span id="tv-feels" style="color:#fff;">--</span></div>
+            <div>HUMIDITY: <span id="tv-humidity" style="color:#fff;">--</span></div>
+            <div>WIND: <span id="tv-wind" style="color:#fff;">--</span></div>
+            <div>BARO: <span id="tv-baro" style="color:#fff;">--</span></div>
+            <div>RIVER STAGE: <span id="tv-river" style="color:#00ccff;">--</span></div>
         </div>
 
         <!-- Footer -->
@@ -433,38 +488,7 @@
 
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <script>
-        // --- KEEP-AWAKE & AUTO-REFRESH ENGINES ---
-        // 1. Screen Wake Lock API (Prevents screen/device from going to sleep)
-        let wakeLock = null;
-        async function requestWakeLock() {
-            if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLock.addEventListener('release', () => {
-                        console.log('Screen Wake Lock released');
-                    });
-                } catch (err) {
-                    console.warn(`Wake Lock error: ${err.name}, ${err.message}`);
-                }
-            }
-        }
-
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
-        });
-        requestWakeLock();
-
-        // 2. Periodic Safety Reload (Refreshes page every 4 hours to clear cache/memory leaks during long shifts)
-        setTimeout(() => {
-            location.reload();
-        }, 4 * 60 * 60 * 1000);
-
         // Sector State & Config
         const hqLat = 40.2681;
         const hqLng = -96.7470;
@@ -473,29 +497,70 @@
         let selectedNodeId = null;
         let lastRadarSyncTime = null;
         let audioEnabled = true;
+        let isTvMode = false;
+        let isRemoteMapMoving = false;
         let networkErrors = { nws: 0, weather: 0, usgs: 0, radarTiles: 0 };
+
+        // Wind Gauge Telemetry State
+        let windSpeedMph = 0;
+        let windDirectionDeg = 0; // 0 = From North
 
         // Layer Visibility Toggles
         const layerConfig = { radar: true, rings: true, roads: true, nodes: true };
 
-        // --- MULTI-DEVICE WEBSOCKET SYNC ENGINE ---
+        // --- DUAL SYNC ENGINE (MQTT WebSocket + Local BroadcastChannel Fallback) ---
+        const publicBrokers = [
+            'wss://broker.hivemq.com:8884/mqtt',
+            'wss://broker.emqx.io:8084/mqtt',
+            'wss://test.mosquitto.org:8081/mqtt'
+        ];
+        let currentBrokerIndex = 0;
+
         const myClientId = 'HUD_' + Math.random().toString(36).substring(2, 9);
         const urlParams = new URLSearchParams(window.location.search);
-        const roomId = urlParams.get('room') || 'GAGE-HUD-1';
-        const syncTopic = `gage_county_eoc/sync/${roomId}`;
+        let roomId = urlParams.get('room') || 'GAGE-HUD-1';
+        let syncTopic = `gage_county_eoc/sync/${roomId}`;
 
         document.getElementById('sync-room-id').innerText = roomId;
 
         let mqttClient = null;
+        let localChannel = null;
+
+        try {
+            localChannel = new BroadcastChannel('gage_county_eoc_' + roomId);
+            localChannel.onmessage = (event) => {
+                const data = event.data;
+                if (data && data.sender !== myClientId) {
+                    applyRemoteSyncAction(data.action, data.payload);
+                }
+            };
+        } catch (e) {
+            console.warn('BroadcastChannel not supported in this environment:', e);
+        }
 
         function initSyncEngine() {
             const syncStatusEl = document.getElementById('sync-status');
+            
+            if (window.location.protocol === 'file:') {
+                if (syncStatusEl) {
+                    syncStatusEl.innerText = 'LOCAL SYNC';
+                    syncStatusEl.style.color = '#00ff66';
+                }
+                return;
+            }
+
+            const brokerUrl = publicBrokers[currentBrokerIndex];
+
+            if (mqttClient) {
+                try { mqttClient.end(true); } catch(e){}
+            }
+
             try {
-                mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+                mqttClient = mqtt.connect(brokerUrl, {
                     clientId: myClientId,
                     keepalive: 30,
-                    reconnectPeriod: 3000,
-                    connectTimeout: 8000
+                    reconnectPeriod: 4000,
+                    connectTimeout: 6000
                 });
 
                 mqttClient.on('connect', () => {
@@ -505,6 +570,7 @@
                     }
                     mqttClient.subscribe(syncTopic, (err) => {
                         if (err) console.warn('Sync subscribe error:', err);
+                        else forceSyncState();
                     });
                 });
 
@@ -520,10 +586,7 @@
                 });
 
                 mqttClient.on('error', () => {
-                    if (syncStatusEl) {
-                        syncStatusEl.innerText = 'DEGRADED';
-                        syncStatusEl.style.color = '#ffaa00';
-                    }
+                    handleSyncConnectionFailure();
                 });
 
                 mqttClient.on('offline', () => {
@@ -534,23 +597,65 @@
                 });
             } catch (err) {
                 console.warn('Sync Engine initialization error:', err);
-                if (syncStatusEl) {
-                    syncStatusEl.innerText = 'ERROR';
-                    syncStatusEl.style.color = '#ff3344';
-                }
+                handleSyncConnectionFailure();
+            }
+        }
+
+        function handleSyncConnectionFailure() {
+            const syncStatusEl = document.getElementById('sync-status');
+            currentBrokerIndex = (currentBrokerIndex + 1) % publicBrokers.length;
+            if (syncStatusEl) {
+                syncStatusEl.innerText = 'LOCAL FALLBACK';
+                syncStatusEl.style.color = '#00ff66';
+            }
+        }
+
+        function changeRoomPrompt() {
+            const newRoom = prompt("Enter Sync Room Name for Multi-Screen Display:", roomId);
+            if (newRoom && newRoom.trim() !== "") {
+                roomId = newRoom.trim();
+                syncTopic = `gage_county_eoc/sync/${roomId}`;
+                document.getElementById('sync-room-id').innerText = roomId;
+                try {
+                    if (localChannel) localChannel.close();
+                    localChannel = new BroadcastChannel('gage_county_eoc_' + roomId);
+                    localChannel.onmessage = (event) => {
+                        const data = event.data;
+                        if (data && data.sender !== myClientId) {
+                            applyRemoteSyncAction(data.action, data.payload);
+                        }
+                    };
+                } catch(e) {}
+                initSyncEngine();
             }
         }
 
         function broadcastAction(action, payload = {}) {
+            const messageObj = {
+                sender: myClientId,
+                action: action,
+                payload: payload,
+                timestamp: Date.now()
+            };
+
             if (mqttClient && mqttClient.connected) {
-                const message = JSON.stringify({
-                    sender: myClientId,
-                    action: action,
-                    payload: payload,
-                    timestamp: Date.now()
-                });
-                mqttClient.publish(syncTopic, message);
+                mqttClient.publish(syncTopic, JSON.stringify(messageObj));
             }
+
+            if (localChannel) {
+                try { localChannel.postMessage(messageObj); } catch(e){}
+            }
+        }
+
+        function forceSyncState() {
+            if (!map) return;
+            const center = map.getCenter();
+            broadcastAction('FULL_SYNC', {
+                center: [center.lat, center.lng],
+                zoom: map.getZoom(),
+                selectedNodeId: selectedNodeId,
+                layerConfig: layerConfig
+            });
         }
 
         function applyRemoteSyncAction(action, payload) {
@@ -559,7 +664,9 @@
                 if (node) {
                     selectedNodeId = node.id;
                     node.intensity = 1.0;
+                    isRemoteMapMoving = true;
                     map.flyTo(node.coords, 12, { duration: 1.2 });
+                    setTimeout(() => { isRemoteMapMoving = false; }, 1300);
                     playHudSound('click');
                 }
             } else if (action === 'RESET_HQ') {
@@ -569,7 +676,39 @@
                 if (layerConfig[layerKey] !== state) {
                     toggleLayer(layerKey, true);
                 }
+            } else if (action === 'MAP_MOVE') {
+                if (payload.center && payload.zoom) {
+                    isRemoteMapMoving = true;
+                    map.setView(payload.center, payload.zoom, { animate: true });
+                    setTimeout(() => { isRemoteMapMoving = false; }, 500);
+                }
+            } else if (action === 'FULL_SYNC') {
+                if (payload.layerConfig) {
+                    Object.keys(payload.layerConfig).forEach(key => {
+                        if (layerConfig[key] !== payload.layerConfig[key]) {
+                            toggleLayer(key, true);
+                        }
+                    });
+                }
+                if (payload.center && payload.zoom) {
+                    isRemoteMapMoving = true;
+                    map.setView(payload.center, payload.zoom, { animate: true });
+                    setTimeout(() => { isRemoteMapMoving = false; }, 500);
+                }
+                if (payload.selectedNodeId !== undefined) {
+                    selectedNodeId = payload.selectedNodeId;
+                }
             }
+        }
+
+        function toggleTvMode() {
+            isTvMode = !isTvMode;
+            document.body.classList.toggle('tv-mode', isTvMode);
+            const btn = document.getElementById('btn-tvmode');
+            if (btn) {
+                btn.className = isTvMode ? 'btn-toggle active' : 'btn-toggle';
+            }
+            setTimeout(() => { syncCanvas(); }, 100);
         }
 
         // Web Audio Synthesizer Engine
@@ -686,6 +825,16 @@
             attributionControl: false
         });
 
+        map.on('moveend', () => {
+            if (!isRemoteMapMoving) {
+                const center = map.getCenter();
+                broadcastAction('MAP_MOVE', {
+                    center: [center.lat, center.lng],
+                    zoom: map.getZoom()
+                });
+            }
+        });
+
         // ESRI Base Map
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
 
@@ -740,6 +889,7 @@
         // 3. USGS Big Blue River Hydrology Monitor
         async function updateUsgsRiverStage() {
             const stageEl = document.getElementById('river-stage');
+            const tvRiverEl = document.getElementById('tv-river');
             const usgsStatusEl = document.getElementById('usgs-status');
 
             try {
@@ -754,15 +904,19 @@
                 if (latestValue !== undefined) {
                     const feet = parseFloat(latestValue).toFixed(2);
                     stageEl.innerText = `${feet} FT`;
+                    tvRiverEl.innerText = `${feet} FT`;
 
                     if (feet >= 18.0) {
                         stageEl.style.color = '#ff3344';
                         stageEl.innerText += ' [MAJOR FLOOD]';
+                        tvRiverEl.style.color = '#ff3344';
                     } else if (feet >= 14.0) {
                         stageEl.style.color = '#ffaa00';
                         stageEl.innerText += ' [ACTION STAGE]';
+                        tvRiverEl.style.color = '#ffaa00';
                     } else {
                         stageEl.style.color = '#00ccff';
+                        tvRiverEl.style.color = '#00ccff';
                     }
 
                     usgsStatusEl.innerText = 'ONLINE';
@@ -774,7 +928,7 @@
                 networkErrors.usgs = Math.min(networkErrors.usgs + 1, 5);
                 if (networkErrors.usgs > 2) {
                     stageEl.innerText = 'OFFLINE';
-                    stageEl.style.color = '#ffaa00';
+                    tvRiverEl.innerText = 'OFFLINE';
                     usgsStatusEl.innerText = 'DEGRADED';
                     usgsStatusEl.style.color = '#ffaa00';
                 }
@@ -785,7 +939,7 @@
         updateUsgsRiverStage();
         setInterval(updateUsgsRiverStage, 180000);
 
-        // 4. NWS Active Alerts (Integrated Zone NEZ089 Feed)
+        // 4. NWS Active Alerts
         let warningsLayer = null;
         let lastHadSevereWarning = false;
 
@@ -795,13 +949,9 @@
             const alertDetails = document.getElementById('alert-details');
             const alertBadge = document.getElementById('alert-status-badge');
 
-            const nwsUrl = 'https://api.weather.gov/alerts/active?zone=NEZ089';
-
             try {
-                const res = await fetchWithTimeout(nwsUrl, {
-                    headers: {
-                        'User-Agent': 'TacticalMonitor/1.0 (emergency-ops@local)'
-                    },
+                const res = await fetchWithTimeout('https://api.weather.gov/alerts/active?area=NE', {
+                    headers: { 'User-Agent': '(GageCountyEOCMonitor, contact@gagecounty.org)' },
                     timeout: 8000
                 });
 
@@ -810,11 +960,16 @@
 
                 if (warningsLayer) map.removeLayer(warningsLayer);
 
-                const alerts = data.features || [];
-                let activeHazards = [];
-                let hasWarning = false;
+                const gageFeatures = (data.features || []).filter(feature => {
+                    const props = feature.properties || {};
+                    const area = (props.areaDesc || '').toLowerCase();
+                    const ugc = (props.geocode && props.geocode.UGC) ? props.geocode.UGC : [];
+                    return area.includes('gage') || ugc.includes('NEZ089') || ugc.includes('NEC067');
+                });
 
-                warningsLayer = L.geoJSON(data, {
+                let activeHazards = [];
+
+                warningsLayer = L.geoJSON({ type: 'FeatureCollection', features: gageFeatures }, {
                     style: function(feature) {
                         const eventName = (feature.properties?.event) || '';
                         if (eventName.includes('Tornado')) return { color: '#ff0033', weight: 3, fillColor: '#ff0033', fillOpacity: 0.35 };
@@ -823,18 +978,15 @@
                         return { color: '#ffff00', weight: 2, fillColor: '#ffff00', fillOpacity: 0.15 };
                     },
                     onEachFeature: function(feature) {
-                        const eventName = feature.properties?.event;
-                        if (eventName && !activeHazards.includes(eventName)) {
-                            activeHazards.push(eventName);
-                        }
-                        if (eventName && eventName.includes('Warning')) {
-                            hasWarning = true;
+                        if (feature.properties?.event && !activeHazards.includes(feature.properties.event)) {
+                            activeHazards.push(feature.properties.event);
                         }
                     }
                 }).addTo(map);
 
-                if (alerts.length > 0) {
-                    const primaryAlert = alerts[0].properties || {};
+                if (activeHazards.length > 0) {
+                    const primary = activeHazards[0];
+                    const hasWarning = activeHazards.some(h => h.includes('Warning'));
                     
                     if (hasWarning && !lastHadSevereWarning) {
                         playHudSound('warning');
@@ -846,12 +998,8 @@
                         alertBadge.innerText = hasWarning ? 'WARNING ACTIVE' : 'ADVISORY ACTIVE';
                         alertBadge.style.color = hasWarning ? '#ff3344' : '#ffaa00';
                     }
-                    if (alertTitle) {
-                        alertTitle.innerText = activeHazards.length > 1 ? `${activeHazards.length} ACTIVE HAZARDS` : (primaryAlert.event || 'HAZARD ALERT').toUpperCase();
-                    }
-                    if (alertDetails) {
-                        alertDetails.innerText = primaryAlert.headline || activeHazards.join(' | ');
-                    }
+                    if (alertTitle) alertTitle.innerText = activeHazards.length > 1 ? `${activeHazards.length} ACTIVE HAZARDS` : primary.toUpperCase();
+                    if (alertDetails) alertDetails.innerText = activeHazards.join(' | ');
                 } else {
                     lastHadSevereWarning = false;
                     if (alertBox) alertBox.className = '';
@@ -860,13 +1008,13 @@
                         alertBadge.style.color = '#00ff66';
                     }
                     if (alertTitle) alertTitle.innerText = 'NO ACTIVE ALERTS';
-                    if (alertDetails) alertDetails.innerText = 'Targeting Gage County sector (NEZ089) for active weather hazards.';
+                    if (alertDetails) alertDetails.innerText = 'No severe warnings, watches, or advisories active in Beatrice / Gage County sector.';
                 }
 
                 networkErrors.nws = 0;
 
             } catch (err) {
-                console.warn('NWS Zone Feed Error:', err.message || err);
+                console.warn('NWS Alerts Warning:', err.message || err);
                 networkErrors.nws = Math.min(networkErrors.nws + 1, 5);
             } finally {
                 updateSystemHealth();
@@ -875,23 +1023,41 @@
         updateNwsAlerts();
         setInterval(updateNwsAlerts, 60000);
 
-        // 5. Open-Meteo Extended Surface Weather Telemetry
+        // 5. Open-Meteo Surface Weather & Wind Vector Update
         async function updateWeatherData() {
             try {
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${hqLat}&longitude=${hqLng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch`;
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${hqLat}&longitude=${hqLng}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,apparent_temperature,pressure_msl&temperature_unit=fahrenheit&wind_speed_unit=mph`;
                 const res = await fetchWithTimeout(url, { timeout: 8000 });
                 const data = await res.json();
                 const cur = data.current;
 
-                document.getElementById('weather-temp').innerText = `${Math.round(cur.temperature_2m)}°F`;
-                document.getElementById('weather-feels').innerText = `${Math.round(cur.apparent_temperature)}°F`;
-                document.getElementById('weather-humidity').innerText = `${Math.round(cur.relative_humidity_2m)}%`;
-                document.getElementById('weather-wind').innerText = `${Math.round(cur.wind_speed_10m)} MPH`;
-                document.getElementById('weather-gusts').innerText = `${Math.round(cur.wind_gusts_10m)} MPH`;
-                document.getElementById('weather-cloud').innerText = `${Math.round(cur.cloud_cover)}%`;
-                document.getElementById('weather-precip').innerText = `${cur.precipitation} IN`;
-                document.getElementById('weather-baro').innerText = `${(cur.pressure_msl * 0.02953).toFixed(2)} inHg`;
+                windSpeedMph = Math.round(cur.wind_speed_10m || 0);
+                windDirectionDeg = Math.round(cur.wind_direction_10m || 0);
+
+                const tempStr = `${Math.round(cur.temperature_2m)}°F`;
+                const feelsStr = `${Math.round(cur.apparent_temperature)}°F`;
+                const humStr = `${Math.round(cur.relative_humidity_2m)}%`;
+                const windStr = `${windSpeedMph} MPH @ ${windDirectionDeg}°`;
+                const baroStr = `${(cur.pressure_msl * 0.02953).toFixed(2)} inHg`;
+
+                document.getElementById('weather-temp').innerText = tempStr;
+                document.getElementById('weather-feels').innerText = feelsStr;
+                document.getElementById('weather-humidity').innerText = humStr;
+                document.getElementById('weather-wind').innerText = windStr;
+                document.getElementById('weather-baro').innerText = baroStr;
                 document.getElementById('weather-status').innerText = 'SYNCED';
+
+                // Update Widget UI
+                document.getElementById('wind-widget-speed').innerText = `${windSpeedMph} MPH`;
+                document.getElementById('wind-widget-vector').innerText = `${windDirectionDeg}° DIRECTION`;
+
+                // Update TV Ticker Elements
+                document.getElementById('tv-temp').innerText = tempStr;
+                document.getElementById('tv-feels').innerText = feelsStr;
+                document.getElementById('tv-humidity').innerText = humStr;
+                document.getElementById('tv-wind').innerText = windStr;
+                document.getElementById('tv-baro').innerText = baroStr;
+
                 networkErrors.weather = 0;
             } catch (e) {
                 networkErrors.weather = Math.min(networkErrors.weather + 1, 5);
@@ -946,7 +1112,9 @@
                     playHudSound('click');
                     selectedNodeId = node.id;
                     node.intensity = 1.0;
+                    isRemoteMapMoving = true;
                     map.flyTo(node.coords, 12, { duration: 1.2 });
+                    setTimeout(() => { isRemoteMapMoving = false; }, 1300);
                     broadcastAction('SELECT_NODE', { nodeId: node.id });
                 });
 
@@ -958,7 +1126,9 @@
         function resetMapFocus(isRemote = false) {
             playHudSound('click');
             selectedNodeId = null;
+            isRemoteMapMoving = true;
             map.flyTo([hqLat, hqLng], 10, { duration: 1.2 });
+            setTimeout(() => { isRemoteMapMoving = false; }, 1300);
             if (!isRemote) {
                 broadcastAction('RESET_HQ');
             }
@@ -1008,6 +1178,104 @@
                 return { x: 0, y: 0, valid: false };
             }
         }
+
+        // 8. Dedicated Tactical Wind Gauge Widget Canvas Render Loop
+        const windCanvas = document.getElementById('windGaugeCanvas');
+        const windCtx = windCanvas.getContext('2d');
+
+        function renderWindGaugeWidget() {
+            const w = windCanvas.width;
+            const h = windCanvas.height;
+            const ox = w / 2;
+            const oy = h / 2;
+            const radius = 46;
+
+            windCtx.clearRect(0, 0, w, h);
+
+            // Circular Outer Border
+            windCtx.strokeStyle = 'rgba(0, 255, 102, 0.6)';
+            windCtx.lineWidth = 1.5;
+            windCtx.beginPath();
+            windCtx.arc(ox, oy, radius, 0, Math.PI * 2);
+            windCtx.stroke();
+
+            // Inner Dotted Degree Ring
+            windCtx.strokeStyle = 'rgba(0, 255, 102, 0.25)';
+            windCtx.lineWidth = 1;
+            windCtx.setLineDash([2, 4]);
+            windCtx.beginPath();
+            windCtx.arc(ox, oy, radius - 6, 0, Math.PI * 2);
+            windCtx.stroke();
+            windCtx.setLineDash([]);
+
+            // Degree Ticks (30 degree intervals)
+            windCtx.strokeStyle = 'rgba(0, 255, 102, 0.5)';
+            for (let deg = 0; deg < 360; deg += 30) {
+                const rad = deg * (Math.PI / 180);
+                const x1 = ox + (radius - 5) * Math.cos(rad);
+                const y1 = oy + (radius - 5) * Math.sin(rad);
+                const x2 = ox + radius * Math.cos(rad);
+                const y2 = oy + radius * Math.sin(rad);
+                windCtx.beginPath();
+                windCtx.moveTo(x1, y1);
+                windCtx.lineTo(x2, y2);
+                windCtx.stroke();
+            }
+
+            // Cardinal Letters
+            windCtx.font = '800 9px "JetBrains Mono", monospace';
+            windCtx.fillStyle = '#ffffff';
+            windCtx.textAlign = 'center';
+            windCtx.textBaseline = 'middle';
+            windCtx.fillText('N', ox, oy - radius + 10);
+            windCtx.fillText('S', ox, oy + radius - 10);
+            windCtx.fillText('E', ox + radius - 10, oy);
+            windCtx.fillText('W', ox - radius + 10, oy);
+
+            // Meteorological Wind Vector: Point Arrow TOWARD direction wind blows
+            const blowTowardRad = ((windDirectionDeg + 180) % 360 - 90) * (Math.PI / 180);
+            const arrowLength = radius - 8;
+
+            const tipX = ox + arrowLength * Math.cos(blowTowardRad);
+            const tipY = oy + arrowLength * Math.sin(blowTowardRad);
+
+            // Vector Line
+            windCtx.strokeStyle = '#00ccff';
+            windCtx.lineWidth = 2.5;
+            windCtx.shadowColor = '#00ccff';
+            windCtx.shadowBlur = 6;
+            windCtx.beginPath();
+            windCtx.moveTo(ox, oy);
+            windCtx.lineTo(tipX, tipY);
+            windCtx.stroke();
+
+            // Arrow Head
+            const headAngle = 0.45;
+            const headLen = 10;
+            windCtx.fillStyle = '#00ccff';
+            windCtx.beginPath();
+            windCtx.moveTo(tipX, tipY);
+            windCtx.lineTo(
+                tipX - headLen * Math.cos(blowTowardRad - headAngle),
+                tipY - headLen * Math.sin(blowTowardRad - headAngle)
+            );
+            windCtx.lineTo(
+                tipX - headLen * Math.cos(blowTowardRad + headAngle),
+                tipY - headLen * Math.sin(blowTowardRad + headAngle)
+            );
+            windCtx.closePath();
+            windCtx.fill();
+            windCtx.shadowBlur = 0;
+
+            // Center Origin Pin
+            windCtx.fillStyle = '#00ff66';
+            windCtx.beginPath();
+            windCtx.arc(ox, oy, 3.5, 0, Math.PI * 2);
+            windCtx.fill();
+
+            requestAnimationFrame(renderWindGaugeWidget);
+        }
+        requestAnimationFrame(renderWindGaugeWidget);
 
         let sweepAngle = 0;
         let lastTime = performance.now();
@@ -1129,35 +1397,10 @@
             requestAnimationFrame(renderRadar);
         }
 
-        // Clock Update Loop (UTC and Central Time Military Clock)
+        // Clock Update Loop
         setInterval(() => {
             const now = new Date();
             document.getElementById('utc-clock').innerText = now.toISOString().replace('T', ' ').substring(11, 19) + " UTC";
-
-            // Central Time Military Clock update
-            try {
-                const tzOptions = { timeZone: 'America/Chicago', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' };
-                const timeParts = new Intl.DateTimeFormat('en-US', tzOptions).formatToParts(now);
-                let hour = timeParts.find(p => p.type === 'hour')?.value || '00';
-                let minute = timeParts.find(p => p.type === 'minute')?.value || '00';
-                let second = timeParts.find(p => p.type === 'second')?.value || '00';
-                
-                const zoneParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', timeZoneName: 'short' }).formatToParts(now);
-                const zoneName = zoneParts.find(p => p.type === 'timeZoneName')?.value || 'CT';
-
-                const dateOptions = { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' };
-                const dateStr = new Intl.DateTimeFormat('en-US', dateOptions).format(now);
-
-                const milClockEl = document.getElementById('central-mil-clock');
-                const zoneEl = document.getElementById('central-zone-label');
-                const dateEl = document.getElementById('central-date');
-
-                if (milClockEl) milClockEl.innerText = `${hour}${minute}${second}H`;
-                if (zoneEl) zoneEl.innerText = `24H / ${zoneName}`;
-                if (dateEl) dateEl.innerText = dateStr;
-            } catch (e) {
-                console.warn('Central clock update error:', e);
-            }
 
             const syncEl = document.getElementById('radar-sync-time');
             if (syncEl) {
